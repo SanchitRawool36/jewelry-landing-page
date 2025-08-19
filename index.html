@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Jewelers - 3D Showcase</title>
+    <style>
+        :root{
+            --bg: #f6f9fb;
+            --header-bg: #ffffff;
+            --header-fg: #0b2545;
+            --accent: #2aa9a0;
+            --muted: #667085;
+        }
+        html,body{height:100%;margin:0}
+        body{display:flex;flex-direction:column;background:var(--bg);color:var(--header-fg);font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial}
+        header{background:var(--header-bg);color:var(--header-fg);padding:14px 18px;font-size:18px;box-shadow:0 6px 20px rgba(17,24,39,0.06);text-align:center}
+        .layout{display:grid;grid-template-columns:260px 1fr 340px;gap:12px;align-items:stretch;width:100%;height:calc(100vh - 64px)}
+        #scene-container{flex:1;position:relative;min-height:200px;background:transparent;border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(16,24,40,0.06)}
+        @media(max-width:900px){.layout{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;height:calc(100vh - 64px)}#sidebar,#details{padding:8px}}
+        canvas{display:block;width:100%;height:100%}
+
+        /* Sidebar */
+        #sidebar{padding:14px;background:linear-gradient(180deg,#ffffff 0,#f3f7f9 100%);border-radius:12px}
+        #sidebar h3,#sidebar h4{margin:8px 0}
+        .product-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;margin-bottom:10px;border-radius:10px;border:none;background:transparent;color:var(--header-fg);cursor:pointer;transition:transform 220ms cubic-bezier(.2,.8,.2,1),box-shadow 220ms,background 160ms}
+        .product-btn:hover{background:rgba(45,55,72,0.04);transform:translateX(4px)}
+        .product-btn.active{background:linear-gradient(90deg,#eef7f6,#f6fbfb);box-shadow:0 10px 30px rgba(42,169,160,0.06);transform:translateX(6px) scale(1.01);animation:pop 360ms cubic-bezier(.2,.9,.2,1)}
+        @keyframes pop{0%{transform:translateX(6px) scale(.98)}60%{transform:translateX(6px) scale(1.04)}100%{transform:translateX(6px) scale(1.02)}}
+        .product-btn img{width:56px;height:56px;object-fit:cover;border-radius:8px;margin-right:6px;flex-shrink:0}
+        .prod-meta{display:flex;flex-direction:column}
+        .prod-name{font-size:14px;font-weight:700;color:var(--header-fg)}
+        .prod-price{font-size:13px;color:var(--muted);margin-top:4px}
+        #swatches{display:flex;gap:8px;margin-top:8px}
+        .swatch{width:30px;height:30px;border-radius:50%;border:1px solid rgba(11,37,69,0.06);cursor:pointer;box-shadow:0 2px 6px rgba(10,20,30,0.04)}
+
+    /* finish toggle */
+    .finish-row{margin-top:12px;display:flex;gap:8px;align-items:center}
+    .finish-btn{padding:6px 10px;border-radius:8px;border:1px solid rgba(11,37,69,0.06);background:transparent;cursor:pointer}
+    .finish-btn.active{background:var(--accent);color:#fff;border-color:transparent}
+
+    /* vignette overlay */
+    #vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.06) 100%);} 
+
+    /* details transitions */
+    #details{transition:transform 240ms ease, opacity 240ms ease}
+    #details.hidden{opacity:0;transform:translateY(6px);}
+
+    /* tooltip */
+    .tooltip{position:fixed;padding:6px 8px;background:#111;color:#fff;border-radius:6px;font-size:12px;pointer-events:none;display:none;z-index:9999}
+
+        /* Details */
+        #details{padding:18px;background:linear-gradient(180deg,#ffffff,#fbfeff);border-radius:12px}
+        #details h3{margin-top:4px;color:var(--header-fg)}
+        #buy-btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+
+        /* Loader overlay */
+        .loader-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+        .loader-box{background:rgba(255,255,255,0.95);color:var(--header-fg);padding:10px 14px;border-radius:10px;font-size:14px;pointer-events:auto;box-shadow:0 6px 22px rgba(16,24,40,0.08)}
+
+        /* Modal */
+        .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center}
+        .modal{background:#fff;padding:18px;border-radius:10px;width:340px;color:var(--header-fg)}
+        .modal h4{margin-top:0}
+        .modal button{margin-top:12px}
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <header>
+        Aura Jewelers - Interactive Showcase
+    </header>
+
+    <div class="layout">
+        <aside id="sidebar">
+            <h3>Products</h3>
+            <div id="product-list">
+                <!-- product buttons injected by JS -->
+            </div>
+            <h4>Materials</h4>
+            <div id="swatches">
+                <button class="swatch" data-color="#d4af37" style="background:#d4af37"></button>
+                <button class="swatch" data-color="#e7a29c" style="background:#e7a29c"></button>
+                <button class="swatch" data-color="#c0c0c0" style="background:#c0c0c0"></button>
+            </div>
+            <div class="finish-row">
+                <div>Finish:</div>
+                <button id="finish-polished" class="finish-btn active">Polished</button>
+                <button id="finish-matte" class="finish-btn">Matte</button>
+            </div>
+            <div style="margin-top:12px">
+                <label><input type="checkbox" id="autorotate"> Auto-rotate</label>
+            </div>
+        </aside>
+
+        <div id="scene-container">
+            <div class="loader-overlay" id="loader" style="display:none">
+                <div class="loader-box" id="loader-box">Loading model...</div>
+            </div>
+            <div id="vignette"></div>
+            <canvas id="ground-shadow" width="1024" height="1024" style="position:absolute;left:0;bottom:0;pointer-events:none;opacity:0.9"></canvas>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <aside id="details">
+            <h3 id="product-title">Select a product</h3>
+            <p id="product-desc">Interactive 3D viewer for jewelry.</p>
+            <p id="product-price"></p>
+            <button id="buy-btn">Buy now</button>
+        </aside>
+    </div>
+
+    <div class="modal-backdrop" id="modal">
+        <div class="modal">
+            <h4 id="modal-title">Purchase</h4>
+            <p id="modal-body">Confirm purchase of selected item.</p>
+            <div style="text-align:right">
+                <button id="modal-cancel">Cancel</button>
+                <button id="modal-confirm" style="background:#ff7b54;color:#111;border:none;padding:8px 10px;border-radius:6px;margin-left:8px">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/script.js"></script>
+</body>
+</html>
