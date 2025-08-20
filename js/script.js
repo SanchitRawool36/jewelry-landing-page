@@ -2,6 +2,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // --- Scene, Container, Camera, Renderer ---
 const scene = new THREE.Scene();
@@ -11,9 +18,13 @@ const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container
 camera.position.set(0, 0, 5);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(container.clientWidth, container.clientHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Improve output for shiny metals
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
 container.appendChild(renderer.domElement);
 
 // --- Lighting ---
@@ -55,17 +66,60 @@ scene.add(backFill);
 // --- Load the 3D Model ---
 const loader = new GLTFLoader();
 let model;
+const objLoader = new OBJLoader();
+const mtlLoader = new MTLLoader();
+const stlLoader = new STLLoader();
 
-// create a simple environment using PMREM for better reflections
+// Create a realistic room environment for strong reflections
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
-const envMap = pmremGenerator.fromScene(new THREE.Scene(), 0.04).texture; // subtle
+const envMap = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = envMap;
+
+// --- Postprocessing (Sparkle/Bloom) ---
+let composer, renderPass, bloomPass;
+function setupPostFX() {
+    const size = new THREE.Vector2();
+    renderer.getSize(size);
+    composer = new EffectComposer(renderer);
+    renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    // Gentle bloom tuned for jewelry highlights (avoid whiteout)
+    const strength = 0.42;
+    const radius = 0.18;
+    const threshold = 0.86;
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), strength, radius, threshold);
+    bloomPass.enabled = false;
+    composer.addPass(bloomPass);
+}
+setupPostFX();
 
 // --- Poducts ---
 const products = [
-    { id: 'ring', name: 'Classic Ring', price: '₹199', model: 'assets/models/ring/model.gltf', description: 'A timeless 14k gold ring with a modern profile.' },
-    { id: 'necklace', name: 'Elegant Necklace', price: '₹299', model: 'assets/models/necklace/model.gltf', description: 'A delicate chain with a diamond-inspired pendant.' },
-    { id: 'pendant', name: 'Luxe Pendant', price: '₹249', model: 'assets/models/pendant/model.gltf', description: 'A stylish pendant, perfect for everyday wear.' }
+    {
+        id: 'ring',
+        name: 'Earrings L2',
+        price: '₹199',
+        model: '3D models/Earings_v1_L2.123cc619898a-791f-410f-bf7a-ec5ea3d1a232/11757_Earings_v1_L2.obj',
+        mtl:   '3D models/Earings_v1_L2.123cc619898a-791f-410f-bf7a-ec5ea3d1a232/11757_Earings_v1_L2.mtl',
+        description: 'Refined earrings, Level 2 variant.'
+    },
+    {
+        id: 'necklace',
+        name: 'Necklace L3',
+        price: '₹299',
+        model: '3D models/Necklace_v1_L3.123c0582a019-3350-40e7-aa33-bafa4404b441/11777_necklace_v1_l3.obj',
+        mtl:   '3D models/Necklace_v1_L3.123c0582a019-3350-40e7-aa33-bafa4404b441/11777_necklace_v1_l3.mtl',
+        description: 'Elegant necklace, Level 3 variant.'
+    },
+    {
+        id: 'pendant',
+        name: 'Earrings L1',
+        price: '₹249',
+        model: '3D models/Earings_v1_L1.123cd1ee0199-85f3-4569-a594-2d802e2d0baf/11763_earings_v1_L1.obj',
+        mtl:   '3D models/Earings_v1_L1.123cd1ee0199-85f3-4569-a594-2d802e2d0baf/11763_earings_v1_L1.mtl',
+        description: 'Classic earrings, Level 1 variant.'
+    }
 ];
 
 let currentProduct = null;
@@ -89,6 +143,8 @@ const finishMatte = document.getElementById('finish-matte');
 const groundCanvas = document.getElementById('ground-shadow');
 const tooltip = document.getElementById('tooltip');
 const detailsEl = document.getElementById('details');
+// upload removed
+const sparkleEl = document.getElementById('sparkle');
 
 // Populate product list
 products.forEach(p => {
@@ -133,20 +189,43 @@ finishMatte.addEventListener('click', () => { finish = 'matte'; finishMatte.clas
 function applyFinish() {
     if (!model) return;
     model.traverse(node => {
-        if (node.isMesh && node.material && node.material.isMeshStandardMaterial) {
-            if (finish === 'polished') {
-                node.material.metalness = 0.95;
-                node.material.roughness = 0.12;
-                node.material.envMap = envMap;
-                node.material.envMapIntensity = 1.2;
-            } else {
-                node.material.metalness = 0.15;
-                node.material.roughness = 0.7;
-                node.material.envMap = envMap;
-                node.material.envMapIntensity = 0.3;
+        if (!node.isMesh || !node.material) return;
+        const applyToMat = (mat) => {
+            // Convert non-PBR materials (e.g., MeshPhong from MTL) to MeshPhysical for better metals
+            if (!mat.isMeshStandardMaterial && !mat.isMeshPhysicalMaterial) {
+                const newMat = new THREE.MeshPhysicalMaterial({
+                    color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
+                    map: mat.map || null,
+                    normalMap: mat.normalMap || null,
+                    roughnessMap: mat.roughnessMap || null,
+                    metalnessMap: mat.metalnessMap || null
+                });
+                mat = newMat;
+                node.material = newMat;
             }
-            node.material.needsUpdate = true;
-        }
+            if (finish === 'polished') {
+                mat.metalness = 0.96;
+                mat.roughness = 0.08;
+                if (mat.isMeshPhysicalMaterial) {
+                    mat.clearcoat = 0.65;
+                    mat.clearcoatRoughness = 0.06;
+                }
+                mat.envMap = envMap;
+                mat.envMapIntensity = 1.35;
+            } else {
+                mat.metalness = 0.2;
+                mat.roughness = 0.8;
+                if (mat.isMeshPhysicalMaterial) {
+                    mat.clearcoat = 0.0;
+                    mat.clearcoatRoughness = 0.3;
+                }
+                mat.envMap = envMap;
+                mat.envMapIntensity = 0.35;
+            }
+            mat.needsUpdate = true;
+        };
+        if (Array.isArray(node.material)) node.material.forEach(applyToMat);
+        else applyToMat(node.material);
     });
 }
 
@@ -155,12 +234,42 @@ let autoRotate = false;
 function applyMaterialColor(hex) {
     if (!model) return;
     model.traverse(node => {
-        if (node.isMesh && node.material && node.material.isMeshStandardMaterial) {
-            node.material.color.set(hex);
-            node.material.metalness = 0.9;
-            node.material.roughness = 0.25;
-        }
+        if (!node.isMesh || !node.material) return;
+        const setColor = (mat) => {
+            if (!mat.isMeshStandardMaterial && !mat.isMeshPhysicalMaterial) {
+                // convert to physical so color + finish work consistently
+                const newMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(hex) });
+                node.material = newMat;
+                mat = newMat;
+            }
+            mat.color.set(hex);
+            mat.metalness = 0.9;
+            mat.roughness = 0.25;
+            mat.envMap = envMap;
+            mat.envMapIntensity = 1.2;
+            mat.needsUpdate = true;
+        };
+        if (Array.isArray(node.material)) node.material.forEach(setColor);
+        else setColor(node.material);
     });
+}
+
+// Ensure loaded models are a consistent size and centered at the origin
+function normalizeAndCenter(object3D, targetSize = 1.2) {
+    if (!object3D) return;
+    const box = new THREE.Box3().setFromObject(object3D);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim && isFinite(maxDim) && maxDim > 0) {
+        const s = targetSize / maxDim;
+        object3D.scale.multiplyScalar(s);
+    }
+    // Recompute center after scaling and shift model to origin
+    const box2 = new THREE.Box3().setFromObject(object3D);
+    const center = new THREE.Vector3();
+    box2.getCenter(center);
+    object3D.position.sub(center);
 }
 
 async function selectProduct(id) {
@@ -172,7 +281,7 @@ async function selectProduct(id) {
     descEl.textContent = p.description || 'Loading...';
 
     // set active button
-    productButtons.forEach(b => b.classList.toggle('active', b.textContent === p.name));
+    productButtons.forEach(b => b.classList.toggle('active', b.dataset.id === id));
 
     // show loader
     loaderEl.style.display = 'flex';
@@ -184,39 +293,168 @@ async function selectProduct(id) {
         model = null;
     }
 
-    // prefer .glb when available (smaller/binary), fall back to provided .gltf
-    const modelUrl = await resolveModelUrlVariants(p);
+    // Determine final model URL (glb/gltf keep resolver; obj/stl use as-is)
+    let modelUrl = await resolveModelUrlVariants(p);
+    // encode spaces and special chars for URL loading
+    modelUrl = encodeURI(modelUrl);
     console.log('Selecting product:', p.name, modelUrl);
 
     try {
-        const resp = await fetch(modelUrl);
-        if (resp.ok) {
-            loader.load(modelUrl, (gltf) => {
-                model = gltf.scene;
-                model.traverse(n => { if (n.isMesh) n.castShadow = true; });
-                scene.add(model);
-                descEl.textContent = p.description || 'Model loaded';
-                loaderEl.style.display = 'none';
-                autoFitCamera(model);
-                applyFinish();
-                drawGroundShadow();
-            }, (xhr) => {
-                if (xhr.lengthComputable) {
-                    const pct = Math.round((xhr.loaded/xhr.total)*100);
-                    descEl.textContent = 'Loading: ' + pct + '%';
-                    loaderBox.textContent = 'Loading model: ' + pct + '%';
-                }
-            }, (err) => {
-                console.error('Model load error', err);
-                descEl.textContent = 'Failed to load model — using placeholder';
+        const ext = (modelUrl.split('.').pop() || '').toLowerCase();
+    if (ext === 'glb' || ext === 'gltf') {
+            const resp = await fetch(modelUrl);
+            if (resp.ok) {
+                loader.load(modelUrl, (gltf) => {
+                    model = gltf.scene;
+                    model.traverse(n => { if (n.isMesh) n.castShadow = true; });
+                    normalizeAndCenter(model);
+                    scene.add(model);
+                    descEl.textContent = p.description || 'Model loaded';
+                    loaderEl.style.display = 'none';
+                    autoFitCamera(model);
+                    applyFinish();
+                    drawGroundShadow();
+                }, (xhr) => {
+                    if (xhr.lengthComputable) {
+                        const pct = Math.round((xhr.loaded/xhr.total)*100);
+                        descEl.textContent = 'Loading: ' + pct + '%';
+                        loaderBox.textContent = 'Loading model: ' + pct + '%';
+                    }
+                }, (err) => {
+                    console.error('Model load error', err);
+                    descEl.textContent = 'Failed to load model — using placeholder';
+                    loaderEl.style.display = 'none';
+                    createProductPlaceholder(id);
+                });
+            } else {
+                console.warn('Product model not found, using placeholder', resp.status);
+                descEl.textContent = 'Model not found — using placeholder';
                 loaderEl.style.display = 'none';
                 createProductPlaceholder(id);
-            });
+            }
+        } else if (ext === 'obj') {
+            // Load OBJ, optionally with MTL
+            try {
+                if (p.mtl) {
+                    const mtlUrl = encodeURI(p.mtl);
+                    const mresp = await fetch(mtlUrl);
+                    if (mresp.ok) {
+                        mtlLoader.load(mtlUrl, (materials) => {
+                            materials.preload();
+                            objLoader.setMaterials(materials);
+                            objLoader.load(modelUrl, (obj) => {
+                                model = obj;
+                                model.traverse(n => { if (n.isMesh) n.castShadow = true; });
+                                normalizeAndCenter(model);
+                                scene.add(model);
+                                descEl.textContent = p.description || 'Model loaded';
+                                loaderEl.style.display = 'none';
+                                autoFitCamera(model);
+                                applyFinish();
+                                drawGroundShadow();
+                            }, (xhr) => {
+                                if (xhr.lengthComputable) {
+                                    const pct = Math.round((xhr.loaded/xhr.total)*100);
+                                    descEl.textContent = 'Loading: ' + pct + '%';
+                                    loaderBox.textContent = 'Loading model: ' + pct + '%';
+                                }
+                            }, (err) => {
+                                console.error('OBJ load error', err);
+                                loaderEl.style.display = 'none';
+                                createProductPlaceholder(id);
+                            });
+                        }, undefined, (e) => {
+                            console.warn('MTL load failed, loading OBJ without materials', e);
+                            objLoader.load(modelUrl, (obj) => {
+                                model = obj;
+                                model.traverse(n => { if (n.isMesh) n.castShadow = true; });
+                                normalizeAndCenter(model);
+                                scene.add(model);
+                                descEl.textContent = p.description || 'Model loaded';
+                                loaderEl.style.display = 'none';
+                                autoFitCamera(model);
+                                applyFinish();
+                                drawGroundShadow();
+                            }, undefined, (err) => {
+                                console.error('OBJ load error', err);
+                                loaderEl.style.display = 'none';
+                                createProductPlaceholder(id);
+                            });
+                        });
+                    } else {
+                        console.warn('MTL not found, loading OBJ without materials');
+                        objLoader.load(modelUrl, (obj) => {
+                            model = obj;
+                            model.traverse(n => { if (n.isMesh) n.castShadow = true; });
+                            normalizeAndCenter(model);
+                            scene.add(model);
+                            descEl.textContent = p.description || 'Model loaded';
+                            loaderEl.style.display = 'none';
+                            autoFitCamera(model);
+                            applyFinish();
+                            drawGroundShadow();
+                        }, undefined, (err) => {
+                            console.error('OBJ load error', err);
+                            loaderEl.style.display = 'none';
+                            createProductPlaceholder(id);
+                        });
+                    }
+                } else {
+                    objLoader.load(modelUrl, (obj) => {
+                        model = obj;
+                        model.traverse(n => { if (n.isMesh) n.castShadow = true; });
+                        normalizeAndCenter(model);
+                        scene.add(model);
+                        descEl.textContent = p.description || 'Model loaded';
+                        loaderEl.style.display = 'none';
+                        autoFitCamera(model);
+                        applyFinish();
+                        drawGroundShadow();
+                    }, undefined, (err) => {
+                        console.error('OBJ load error', err);
+                        loaderEl.style.display = 'none';
+                        createProductPlaceholder(id);
+                    });
+                }
+            } catch (e) {
+                console.error('OBJ/MTL fetch error', e);
+                loaderEl.style.display = 'none';
+                createProductPlaceholder(id);
+            }
+        } else if (ext === 'stl') {
+            try {
+                stlLoader.load(modelUrl, (geometry) => {
+                    const material = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.25 });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.castShadow = true;
+                    model = mesh;
+                    normalizeAndCenter(model);
+                    scene.add(mesh);
+                    descEl.textContent = p.description || 'Model loaded';
+                    loaderEl.style.display = 'none';
+                    autoFitCamera(model);
+                    applyFinish();
+                    drawGroundShadow();
+                }, (xhr) => {
+                    if (xhr.lengthComputable) {
+                        const pct = Math.round((xhr.loaded/xhr.total)*100);
+                        descEl.textContent = 'Loading: ' + pct + '%';
+                        loaderBox.textContent = 'Loading model: ' + pct + '%';
+                    }
+                }, (err) => {
+                    console.error('STL load error', err);
+                    loaderEl.style.display = 'none';
+                    createProductPlaceholder(id);
+                });
+            } catch (e) {
+                console.error('STL fetch error', e);
+                loaderEl.style.display = 'none';
+                createProductPlaceholder(id);
+            }
         } else {
-            console.warn('Product model not found, using placeholder', resp.status);
-        descEl.textContent = 'Model not found — using placeholder';
-        loaderEl.style.display = 'none';
-        createProductPlaceholder(id);
+            console.warn('Unknown model extension for', modelUrl, '— using placeholder');
+            loaderEl.style.display = 'none';
+            createProductPlaceholder(id);
         }
     } catch (e) {
         console.error('Error fetching model', e);
@@ -228,29 +466,28 @@ async function selectProduct(id) {
 
 // Try variants for a product model URL. Prefer .glb then .gltf then fallback to original.
 async function resolveModelUrlVariants(p) {
-    // if the product model explicitly has an extension, strip it to build variants
-    const hasExt = /\.(glb|gltf)$/i.test(p.model);
-    const base = hasExt ? p.model.replace(/\.(glb|gltf)$/i, '') : p.model;
-    const candidates = [base + '.glb', base + '.gltf', p.model];
-
-    for (const url of candidates) {
-        try {
-            // try a HEAD request first to be lighter when supported
-            const resp = await fetch(url, { method: 'HEAD' });
-            if (resp && resp.ok) return url;
-        } catch (e) {
-            // some servers disallow HEAD; try GET as fallback check
+    // If extension is glb/gltf, try both with original case; otherwise return as-is
+    const original = p.model || '';
+    const hasMatch = original.match(/\.(glb|gltf)$/i);
+    if (hasMatch) {
+        const base = original.replace(/\.(glb|gltf)$/i, '');
+        const candidates = [base + '.glb', base + '.gltf', original];
+        for (const url of candidates) {
             try {
-                const resp2 = await fetch(url, { method: 'GET' });
-                if (resp2 && resp2.ok) return url;
-            } catch (e2) {
-                // ignore and continue to next candidate
+                const head = await fetch(encodeURI(url), { method: 'HEAD' });
+                if (head && head.ok) return url;
+            } catch (e) {
+                try {
+                    const get = await fetch(encodeURI(url), { method: 'GET' });
+                    if (get && get.ok) return url;
+                } catch {
+                    // continue
+                }
             }
         }
+        return original;
     }
-
-    // last resort: return the original model string
-    return p.model;
+    return original;
 }
 
 function createProductPlaceholder(id) {
@@ -329,16 +566,17 @@ async function generateThumbnails() {
 
         // try to load model; if fails, use placeholder
         try {
-            // prefer .glb when possible for thumbnails too
-            const tryUrl = await resolveModelUrlVariants(p);
-            const resp = await fetch(tryUrl);
-            if (resp.ok) {
-                await new Promise((resolve, reject) => {
+            const tryUrl = encodeURI(await resolveModelUrlVariants(p));
+            const ext = (tryUrl.split('.').pop() || '').toLowerCase();
+            await new Promise((resolve) => {
+                if (ext === 'glb' || ext === 'gltf') {
                     loader.load(tryUrl, (gltf) => {
                         const obj = gltf.scene;
                         obj.traverse(n => { if (n.isMesh) n.castShadow = false; });
+                        normalizeAndCenter(obj);
+                        // Use the same env for shinier thumbs
+                        tmpScene.environment = envMap;
                         tmpScene.add(obj);
-                        // auto-fit tmp camera
                         const box = new THREE.Box3().setFromObject(obj);
                         const size = new THREE.Vector3(); box.getSize(size);
                         const center = new THREE.Vector3(); box.getCenter(center);
@@ -346,34 +584,69 @@ async function generateThumbnails() {
                         tmpCamera.position.z += Math.max(size.x, size.y, size.z) * 2.2;
                         tmpCamera.lookAt(center);
                         tmpRenderer.render(tmpScene, tmpCamera);
-                        const dataUrl = tmpRenderer.domElement.toDataURL();
-                        insertThumbnail(i, dataUrl);
-                        // cleanup
+                        insertThumbnail(i, tmpRenderer.domElement.toDataURL());
                         tmpScene.remove(obj);
                         resolve();
-                    }, undefined, (err) => {
-                        console.warn('Thumbnail load failed for', p.id, err);
-                        // fallback placeholder
-                        const geom = new THREE.SphereGeometry(0.5, 24, 24);
-                        const m = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x999999 }));
-                        tmpScene.add(m);
+                    }, undefined, () => { resolve(renderPlaceholder()); });
+                } else if (ext === 'obj') {
+                    const finishObj = (obj) => {
+                        obj.traverse(n => { if (n.isMesh) n.castShadow = false; });
+                        normalizeAndCenter(obj);
+                        tmpScene.environment = envMap;
+                        tmpScene.add(obj);
+                        const box = new THREE.Box3().setFromObject(obj);
+                        const size = new THREE.Vector3(); box.getSize(size);
+                        const center = new THREE.Vector3(); box.getCenter(center);
+                        tmpCamera.position.copy(center);
+                        tmpCamera.position.z += Math.max(size.x, size.y, size.z) * 2.2;
+                        tmpCamera.lookAt(center);
                         tmpRenderer.render(tmpScene, tmpCamera);
                         insertThumbnail(i, tmpRenderer.domElement.toDataURL());
-                        tmpScene.remove(m);
+                        tmpScene.remove(obj);
                         resolve();
-                    });
-                });
-            } else {
-                // fallback placeholder
-                const geom = new THREE.SphereGeometry(0.5, 24, 24);
-                const m = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x999999 }));
-                tmpScene.add(m);
-                tmpRenderer.render(tmpScene, tmpCamera);
-                insertThumbnail(i, tmpRenderer.domElement.toDataURL());
-                tmpScene.remove(m);
-            }
+                    };
+                    if (p.mtl) {
+                        const mtlUrl = encodeURI(p.mtl);
+                        mtlLoader.load(mtlUrl, (materials) => {
+                            materials.preload();
+                            objLoader.setMaterials(materials);
+                            objLoader.load(tryUrl, (obj) => finishObj(obj), undefined, () => resolve(renderPlaceholder()));
+                        }, undefined, () => resolve(renderPlaceholder()));
+                    } else {
+                        objLoader.load(tryUrl, (obj) => finishObj(obj), undefined, () => resolve(renderPlaceholder()));
+                    }
+                } else if (ext === 'stl') {
+                    stlLoader.load(tryUrl, (geometry) => {
+                        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x999999 }));
+                        normalizeAndCenter(mesh);
+                        tmpScene.environment = envMap;
+                        tmpScene.add(mesh);
+                        const box = new THREE.Box3().setFromObject(mesh);
+                        const size = new THREE.Vector3(); box.getSize(size);
+                        const center = new THREE.Vector3(); box.getCenter(center);
+                        tmpCamera.position.copy(center);
+                        tmpCamera.position.z += Math.max(size.x, size.y, size.z) * 2.2;
+                        tmpCamera.lookAt(center);
+                        tmpRenderer.render(tmpScene, tmpCamera);
+                        insertThumbnail(i, tmpRenderer.domElement.toDataURL());
+                        tmpScene.remove(mesh);
+                        resolve();
+                    }, undefined, () => resolve(renderPlaceholder()));
+                } else {
+                    resolve(renderPlaceholder());
+                }
+
+                function renderPlaceholder() {
+                    const geom = new THREE.SphereGeometry(0.5, 24, 24);
+                    const m = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x999999 }));
+                    tmpScene.add(m);
+                    tmpRenderer.render(tmpScene, tmpCamera);
+                    insertThumbnail(i, tmpRenderer.domElement.toDataURL());
+                    tmpScene.remove(m);
+                }
+            });
         } catch (e) {
-            console.warn('Thumbnail fetch error', e);
+            console.warn('Thumbnail generation error', e);
             const geom = new THREE.SphereGeometry(0.5, 24, 24);
             const m = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x999999 }));
             tmpScene.add(m);
@@ -430,40 +703,53 @@ productButtons.forEach(btn => {
     btn.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
 });
 
-// Try fetching the model first. If it doesn't exist, create a placeholder mesh so the scene isn't empty.
-async function loadModelOrFallback() {
+// Upload flow: allow selecting a local GLB/GLTF and preview it (session-only)
+// upload removed
+
+// drag & drop onto scene container removed
+
+// upload removed
+
+// Try fetching a model URL (specUrl) or the current/default product and fall back to a placeholder.
+async function loadModelOrFallback(specUrl) {
+    // if a URL is given, use it; otherwise resolve from currentProduct or the first product
+    let url = specUrl;
+    if (!url) {
+        const p = currentProduct || products[0];
+        if (!p) {
+            createPlaceholder();
+            return;
+        }
+        url = await resolveModelUrlVariants(p);
+    }
+
     try {
-        const resp = await fetch(modelUrl, { method: 'GET' });
+        const resp = await fetch(url, { method: 'GET' });
         if (resp.ok) {
-            // model exists on the server — use GLTFLoader to load it
             loader.load(
-                modelUrl,
+                url,
                 function (gltf) {
                     model = gltf.scene;
                     model.traverse(function (node) {
-                        if (node.isMesh) {
-                            node.castShadow = true;
-                        }
+                        if (node.isMesh) node.castShadow = true;
                     });
-                    model.scale.set(0.7, 0.7, 0.7);
-                    model.position.set(0, -0.5, 0);
+                    normalizeAndCenter(model);
                     scene.add(model);
-                    console.log('Model loaded successfully');
+                    autoFitCamera(model);
+                    applyFinish();
+                    drawGroundShadow();
+                    console.log('Model loaded successfully:', url);
                 },
                 function (xhr) {
                     if (xhr.lengthComputable) {
                         const percentComplete = (xhr.loaded / xhr.total) * 100;
                         console.log(Math.round(percentComplete, 2) + '% downloaded');
                     } else {
-                        console.log('Model loading: progress event (bytes loaded):', xhr.loaded);
+                        console.log('Model loading progress (bytes):', xhr.loaded);
                     }
                 },
                 function (error) {
                     console.error('An error happened while loading the model:', error);
-                    if (error && error.target && error.target.status) {
-                        console.error('HTTP status:', error.target.status);
-                    }
-                    console.error('If this persists, run scripts/fetch-model.ps1 from the project root to download the sample model into assets/models/diamond/.');
                     createPlaceholder();
                 }
             );
@@ -488,7 +774,11 @@ function createPlaceholder() {
     console.log('Placeholder model created');
 }
 
-loadModelOrFallback();
+// load default product (if available)
+if (products && products.length) {
+    // attempt to preload the default product, but use selectProduct which handles UI state
+    // loadModelOrFallback(); // deferred to selectProduct
+}
 
 // --- Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -506,7 +796,8 @@ function animate() {
         else model.rotation.y += 0.005;
     }
     controls.update();
-    renderer.render(scene, camera);
+    if (bloomPass && bloomPass.enabled && composer) composer.render();
+    else renderer.render(scene, camera);
 }
 
 // --- Resize Listener ---
@@ -515,7 +806,29 @@ window.addEventListener('resize', () => {
   camera.aspect = rect.width / rect.height;
   camera.updateProjectionMatrix();
   renderer.setSize(rect.width, rect.height);
+    if (composer) composer.setSize(rect.width, rect.height);
 });
+
+// handle orientation changes on mobile devices
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+        const rect = container.getBoundingClientRect();
+        camera.aspect = rect.width / rect.height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(rect.width, rect.height);
+        if (composer) composer.setSize(rect.width, rect.height);
+    }, 250);
+});
+
+// sparkle toggle
+if (sparkleEl) {
+    sparkleEl.addEventListener('change', (e) => {
+        const on = e.target.checked;
+    if (bloomPass) bloomPass.enabled = on;
+    // Slightly reduce exposure when sparkle is on to prevent washout
+    renderer.toneMappingExposure = on ? 0.98 : 1.1;
+    });
+}
 
 // --- Start ---
 animate();
