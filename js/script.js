@@ -145,6 +145,10 @@ const tooltip = document.getElementById('tooltip');
 const detailsEl = document.getElementById('details');
 // upload removed
 const sparkleEl = document.getElementById('sparkle');
+// mobile tabs
+const mobileTabs = document.getElementById('mobile-tabs');
+const tabProducts = document.getElementById('tab-products');
+const tabControls = document.getElementById('tab-controls');
 
 // Populate product list
 products.forEach(p => {
@@ -827,6 +831,32 @@ if (sparkleEl) {
     if (bloomPass) bloomPass.enabled = on;
     // Slightly reduce exposure when sparkle is on to prevent washout
     renderer.toneMappingExposure = on ? 0.98 : 1.1;
+    });
+}
+
+// mobile tab switching for better visibility on phones
+function updateMobileTabsVisibility() {
+    const isMobile = window.matchMedia('(max-width: 600px)').matches;
+    if (!mobileTabs) return;
+    mobileTabs.style.display = isMobile ? 'flex' : 'none';
+    if (!isMobile) {
+        document.getElementById('sidebar').classList.remove('show-controls');
+        if (tabProducts) tabProducts.classList.add('active');
+        if (tabControls) tabControls.classList.remove('active');
+    }
+}
+updateMobileTabsVisibility();
+window.addEventListener('resize', updateMobileTabsVisibility);
+if (tabProducts && tabControls) {
+    tabProducts.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.remove('show-controls');
+        tabProducts.classList.add('active');
+        tabControls.classList.remove('active');
+    });
+    tabControls.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.add('show-controls');
+        tabControls.classList.add('active');
+        tabProducts.classList.remove('active');
     });
 }
 
