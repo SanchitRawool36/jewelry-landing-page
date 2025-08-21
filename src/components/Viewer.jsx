@@ -19,6 +19,7 @@ export default function Viewer({ product, products, onSelect }){
   const [overlayProduct, setOverlayProduct] = useState(null)
   const [finish, setFinish] = useState('polished') // polished | satin | matte
   const [shine, setShine] = useState(1.2) // env intensity multiplier
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   useEffect(()=>{
     const mq = window.matchMedia('(max-width:900px)')
@@ -79,7 +80,8 @@ export default function Viewer({ product, products, onSelect }){
         <div style={{height: '100%', display:'flex', alignItems:'center', justifyContent:'center'}}><div>Viewer will load when visible</div></div>
       )}
 
-      <div className="absolute left-3 top-4 flex flex-col md:flex-row gap-3 md:gap-4">
+      {/* Desktop overlays: visible only on md+ to avoid covering model on phones */}
+      <div className="hidden md:flex absolute left-3 top-4 flex-col md:flex-row gap-3 md:gap-4 z-20">
         <div className="card p-3 shadow-sm max-w-xs">
           <div className="font-semibold mb-1">Products</div>
           {products.map((p) => (
@@ -137,6 +139,84 @@ export default function Viewer({ product, products, onSelect }){
           </div>
         )}
       </div>
+
+      {/* Mobile UI: a small button that opens a bottom sheet with products + details */}
+      {isMobile && (
+        <>
+          <div className="md:hidden absolute left-3 top-4 z-20">
+            <button className="btn" onClick={() => setSheetOpen(true)} aria-label="Open details">Details</button>
+          </div>
+          {sheetOpen && (
+            <>
+              <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setSheetOpen(false)} />
+              <div className="sheet z-50">
+                <div className="card p-3 shadow-sm max-w-full">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold">Products & Details</div>
+                    <button className="btn" onClick={() => setSheetOpen(false)}>Close</button>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <div className="font-semibold mb-1">Products</div>
+                      {products.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2">
+                          <button onClick={() => { onSelect(p); }} className="btn btn-ghost w-full justify-start">
+                            {p.name}{p.priceRs ? ` — ${p.priceRs}rs` : ''}
+                          </button>
+                          <button onClick={() => { setOverlayProduct(p.id); setOverlayOpen(true); }} className="btn">Try</button>
+                        </div>
+                      ))}
+                    </div>
+                    {selected && (
+                      <div>
+                        <div className="text-lg font-semibold flex items-center gap-2">
+                          <span>{selected.name}</span>
+                          {selected.priceRs ? (<span className="chip">{selected.priceRs}rs</span>) : null}
+                        </div>
+                        {selected.description && <div className="text-sm text-slate-600 mt-1">{selected.description}</div>}
+                        {selected.details && (
+                          <ul className="text-sm text-slate-700 list-disc pl-5 mt-2">
+                            {selected.details.map((d, i) => (
+                              <li key={i}>{d}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="mt-3">
+                          <div className="text-sm font-medium mb-1">Finish</div>
+                          <div className="segmented" role="group" aria-label="Finish">
+                            {['polished', 'satin', 'matte'].map((f) => (
+                              <button
+                                key={f}
+                                onClick={() => setFinish(f)}
+                                className="seg-btn"
+                                aria-pressed={finish === f}
+                              >
+                                {f}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-3">
+                            <label className="text-sm font-medium">Shine</label>
+                            <input
+                              type="range"
+                              min="0.6"
+                              max="2"
+                              step="0.05"
+                              value={shine}
+                              onChange={(e) => setShine(parseFloat(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
 
       {overlayOpen && overlayModel && (
         <TryOn productId={overlayProduct} sourceModel={overlayModel} onClose={()=>setOverlayOpen(false)} />
