@@ -24,6 +24,9 @@ export default function Model({ src, low, isMobile, onModelReady, finish = 'poli
   if (src && typeof src === 'object' && src.obj && src.mtl) {
     return <OBJModel src={src} isMobile={isMobile} onModelReady={onModelReady} />
   }
+  if (src && typeof src === 'object' && src.builtin === 'nails') {
+    return <NailsModel isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
+  }
   return null
 }
 
@@ -102,4 +105,39 @@ function finishParams(finish){
     case 'satin': return { metalness: 0.8, roughness: 0.3 }
     default: return { metalness: 1.0, roughness: 0.15 }
   }
+}
+
+function NailsModel({ isMobile, onModelReady, finish = 'polished', shine = 1.2 }){
+  const groupRef = useRef()
+  useEffect(() => {
+    if (!groupRef.current) return
+    // Normalize and center the group
+    normalizeAndCenter(groupRef.current, isMobile ? 0.9 : 1.2)
+    if (onModelReady) onModelReady(groupRef.current)
+  }, [groupRef.current, isMobile])
+
+  const { roughness } = finishParams(finish)
+  const color = '#f5c6c6' // light blush nail color
+
+  return (
+    <group ref={groupRef}>
+      {[0,1,2,3,4].map((i) => {
+        const x = (i - 2) * 0.22
+        const len = 0.4 + i * 0.02
+        const rad = 0.07 - i * 0.007
+        return (
+          <mesh key={i} position={[x, 0, 0]} rotation={[-0.1 + i*0.02, 0, 0]} castShadow receiveShadow>
+            {/* Capsule: radius, length, capSegments, radialSegments */}
+            <capsuleGeometry args={[rad, len, 6, 12]} />
+            <meshPhysicalMaterial color={color} metalness={0} roughness={Math.min(0.6, roughness + 0.2)} clearcoat={0.6} clearcoatRoughness={0.1} envMapIntensity={shine} />
+          </mesh>
+        )
+      })}
+      {/* Small base to suggest a fingertip under nails */}
+      <mesh position={[0, -0.12, -0.05]} rotation={[Math.PI/2, 0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.5, 0.5, 0.15, 24]} />
+        <meshStandardMaterial color="#ffe6d5" metalness={0} roughness={0.7} envMapIntensity={shine*0.5} />
+      </mesh>
+    </group>
+  )
 }

@@ -6,8 +6,17 @@ export default function App(){
   const [product, setProduct] = useState(null)
   const products = [
     {
+      id: 'nails',
+      name: 'Nail Art (3D)',
+      priceRs: 1000,
+      description: '3D procedural nail set for previewing nail art concepts.',
+      details: ['Finish: Glossy clearcoat', 'Adjustable length and shape', 'Great for demos'],
+      src: { builtin: 'nails' }
+    },
+    {
       id: 'earrings-l1',
       name: 'Earrings L1',
+  priceRs: 1000,
   description: 'Elegant earrings with reflective finish and fine detailing.',
   details: ['Material: Gold-tone alloy', 'Stones: Simulated diamonds', 'Weight: ~6g per pair'],
       src: {
@@ -18,6 +27,7 @@ export default function App(){
     {
       id: 'earrings-l2',
       name: 'Earrings L2',
+  priceRs: 1000,
   description: 'Refined second-iteration earrings with subtle facets.',
   details: ['Material: Rose gold-tone alloy', 'Hypoallergenic posts', 'Finish: Satin'],
       src: {
@@ -28,6 +38,7 @@ export default function App(){
     {
       id: 'necklace-l3',
       name: 'Necklace L3',
+  priceRs: 1000,
   description: 'Statement necklace with brilliant stone highlights.',
   details: ['Chain length: 45cm', 'Pendant: Center stone accent', 'Finish: Polished'],
       src: {

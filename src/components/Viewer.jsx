@@ -63,6 +63,7 @@ export default function Viewer({ product, products, onSelect }){
               isMobile={isMobile}
               finish={finish}
               shine={shine}
+              productId={selected?.id}
               onModelReady={(m) => setOverlayModel(m)}
             />
             <ContactShadows position={[0, -0.6, 0]} opacity={0.35} blur={2.4} scale={6} far={3} />
@@ -90,7 +91,7 @@ export default function Viewer({ product, products, onSelect }){
           {products.map((p) => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button onClick={() => onSelect(p)} className="btn btn-ghost w-full justify-start">
-                {p.name}
+                {p.name}{p.priceRs ? ` — ${p.priceRs}rs` : ''}
               </button>
               <button onClick={() => { setOverlayProduct(p.id); setOverlayOpen(true) }} className="btn ml-2">Try</button>
             </div>
@@ -99,7 +100,10 @@ export default function Viewer({ product, products, onSelect }){
 
         {selected && (
           <div className="card p-3 shadow-sm max-w-sm">
-            <div className="text-lg font-semibold">{selected.name}</div>
+            <div className="text-lg font-semibold flex items-center gap-2">
+              <span>{selected.name}</span>
+              {selected.priceRs ? (<span className="chip">{selected.priceRs}rs</span>) : null}
+            </div>
             {selected.description && <div className="text-sm text-slate-600 mt-1">{selected.description}</div>}
             {selected.details && (
               <ul className="text-sm text-slate-700 list-disc pl-5 mt-2">

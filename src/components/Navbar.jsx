@@ -14,7 +14,7 @@ export default function Navbar(){
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden md:block text-sm text-slate-600">Free shipping over $100</div>
+        <div className="hidden md:block text-sm text-slate-600">Free shipping over 1000rs</div>
         <button className="md:hidden btn btn-ghost p-2" onClick={()=>setOpen(v=>!v)} aria-label="menu">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#0b2545" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
