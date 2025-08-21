@@ -79,6 +79,13 @@ export default function TryOn({ productId, sourceModel, onClose }){
     }
   }, [productId, sourceModel])
 
+  // Allow closing with Esc
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose && onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   function onFaceResults(results, pid){
     const or = overlayRef.current
     if (!or || !or.model) return
@@ -130,7 +137,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
       <video ref={videoRef} style={{position:'absolute',width:'100%',height:'100%',objectFit:'cover'}} autoPlay playsInline muted></video>
       <div ref={canvasRef} style={{position:'absolute',inset:0}} />
       <div style={{position:'absolute',top:12,left:12,pointerEvents:'auto'}}>
-        <button onClick={() => { onClose(); }} className="btn">Close</button>
+        <button onClick={() => { onClose(); }} className="btn" aria-label="Close camera">Close Camera</button>
       </div>
     </div>
   )
