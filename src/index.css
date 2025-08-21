@@ -11,12 +11,12 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'
 /* 2D, flat UI primitives using Tailwind's @apply */
 @layer components{
 	.card{ @apply bg-white/90 backdrop-blur rounded-md border border-slate-200; }
-	.btn{ @apply inline-flex items-center justify-center px-3 py-1.5 rounded border border-slate-300 text-sm font-medium text-slate-800 bg-white active:translate-y-px; }
+	.btn{ @apply inline-flex items-center justify-center px-4 py-2 rounded border border-slate-300 text-sm font-medium text-slate-800 bg-white active:translate-y-px min-h-[44px]; }
 	.btn-primary{ @apply bg-black text-white border-black; }
 	.btn-ghost{ @apply bg-transparent border-transparent text-slate-700; }
 	.chip{ @apply inline-flex items-center px-2.5 py-1 rounded-full border border-slate-300 text-xs md:text-sm bg-white; }
 	.segmented{ @apply inline-flex items-center gap-1 p-1 rounded border border-slate-300 bg-white; }
-	.segmented .seg-btn{ @apply px-2 py-1 rounded text-sm; }
+	.segmented .seg-btn{ @apply px-3 py-2 rounded text-sm min-h-[44px]; }
 	.segmented .seg-btn[aria-pressed="true"]{ @apply bg-black text-white; }
 	.sheet{ @apply fixed inset-x-0 bottom-0 p-3 pt-2; padding-bottom: calc(env(safe-area-inset-bottom,0px) + 12px); }
 }

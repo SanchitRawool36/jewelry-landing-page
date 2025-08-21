@@ -1,10 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo, Suspense } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, Html, useProgress, ContactShadows } from '@react-three/drei'
 import Model from './Model'
 import CameraController from './CameraController'
 import TryOn from './TryOn'
-import TwoDPane from './TwoDPane'
 
 function Loader(){
   const { progress } = useProgress()
@@ -20,8 +19,6 @@ export default function Viewer({ product, products, onSelect }){
   const [overlayProduct, setOverlayProduct] = useState(null)
   const [finish, setFinish] = useState('polished') // polished | satin | matte
   const [shine, setShine] = useState(1.2) // env intensity multiplier
-  const [mode2D, setMode2D] = useState(false)
-  const [snapshotUrl, setSnapshotUrl] = useState(null)
 
   useEffect(()=>{
     const mq = window.matchMedia('(max-width:900px)')
@@ -42,14 +39,13 @@ export default function Viewer({ product, products, onSelect }){
 
   return (
     <div className="viewer-root" ref={containerRef} style={{position:'relative'}}>
-    {!mode2D && visible ? (
+  {visible ? (
         <Canvas
           shadows
           dpr={Math.min(2, window.devicePixelRatio)}
           camera={{ fov: isMobile ? 45 : 35, position: [0, 0, 3] }}
           gl={{ physicallyCorrectLights: true }}
         >
-      <CaptureBinder onSnapshot={(url)=>{ setSnapshotUrl(url); setMode2D(true) }} />
           <ambientLight intensity={0.5} />
           <directionalLight position={[5, 8, 4]} intensity={0.9} castShadow />
           <pointLight position={[-3, 2, 3]} intensity={0.6} />
@@ -79,13 +75,11 @@ export default function Viewer({ product, products, onSelect }){
           />
           <CameraController isMobile={isMobile} />
         </Canvas>
-      ) : (mode2D && snapshotUrl) ? (
-        <TwoDPane src={snapshotUrl} onClose={() => setMode2D(false)} />
       ) : (
         <div style={{height: '100%', display:'flex', alignItems:'center', justifyContent:'center'}}><div>Viewer will load when visible</div></div>
       )}
 
-      <div style={{ position: 'absolute', left: 12, top: 18, display: 'flex', gap: 12 }}>
+      <div className="absolute left-3 top-4 flex flex-col md:flex-row gap-3 md:gap-4">
         <div className="card p-3 shadow-sm max-w-xs">
           <div className="font-semibold mb-1">Products</div>
           {products.map((p) => (
@@ -138,12 +132,7 @@ export default function Viewer({ product, products, onSelect }){
                   className="w-full"
                 />
               </div>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => window.__captureCanvasAsImage && window.__captureCanvasAsImage()}
-                    className="btn"
-                  >Snapshot (2D)</button>
-                </div>
+                {/* Snapshot (2D) feature removed */}
             </div>
           </div>
         )}
@@ -154,23 +143,4 @@ export default function Viewer({ product, products, onSelect }){
       )}
     </div>
   )
-}
-
-function CaptureBinder({ onSnapshot }){
-  const { gl } = useThree()
-  useEffect(() => {
-    const fn = () => {
-      try {
-        const url = gl.domElement.toDataURL('image/png')
-        onSnapshot && onSnapshot(url)
-      } catch (e) {
-        console.warn('Snapshot failed', e)
-      }
-    }
-    window.__captureCanvasAsImage = fn
-    return () => {
-      if (window.__captureCanvasAsImage === fn) delete window.__captureCanvasAsImage
-    }
-  }, [gl, onSnapshot])
-  return null
 }
