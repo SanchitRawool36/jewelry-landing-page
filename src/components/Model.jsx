@@ -19,10 +19,10 @@ function normalizeAndCenter(gltfScene, targetSize = 1.2){
 export default function Model({ src, low, isMobile, onModelReady, finish = 'polished', shine = 1.2 }){
   // Delegate to specific components to honor hooks rules
   if (typeof src === 'string' && src.toLowerCase().endsWith('.glb')) {
-    return <GLBModel src={src} low={low} isMobile={isMobile} onModelReady={onModelReady} />
+  return <GLBModel src={src} low={low} isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
   }
   if (src && typeof src === 'object' && src.obj && src.mtl) {
-    return <OBJModel src={src} isMobile={isMobile} onModelReady={onModelReady} />
+  return <OBJModel src={src} isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
   }
   if (src && typeof src === 'object' && src.builtin === 'nails') {
     return <NailsModel isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
@@ -35,27 +35,29 @@ function GLBModel({ src, low, isMobile, onModelReady, finish = 'polished', shine
   const gltf = useGLTF(isMobile && low ? low : src)
 
   useEffect(() => {
-    if (gltf && gltf.scene) {
-      normalizeAndCenter(gltf.scene, isMobile ? 0.9 : 1.2)
-      gltf.scene.traverse((c) => {
-        if (c.isMesh) {
-          c.castShadow = true
-          c.receiveShadow = true
-          if (c.material) {
-            const { metalness, roughness } = finishParams(finish)
-            c.material.metalness = metalness
-            c.material.roughness = roughness
-            c.material.envMapIntensity = shine
-            if ('clearcoat' in c.material) {
-              c.material.clearcoat = finish === 'polished' ? 0.6 : 0.1
-              c.material.clearcoatRoughness = finish === 'polished' ? 0.05 : 0.25
-            }
-          }
+    if (!gltf || !gltf.scene) return
+    // Normalize and center once per model instance or device class change
+  normalizeAndCenter(gltf.scene, isMobile ? 0.6 : 0.9)
+    if (onModelReady) onModelReady(gltf.scene)
+  }, [gltf])
+
+  useEffect(() => {
+    if (!gltf || !gltf.scene) return
+    gltf.scene.traverse((c) => {
+      if (c.isMesh && c.material) {
+        const { metalness, roughness } = finishParams(finish)
+        if ('metalness' in c.material) c.material.metalness = metalness
+        if ('roughness' in c.material) c.material.roughness = roughness
+        c.material.envMapIntensity = shine
+        if ('clearcoat' in c.material) {
+          c.material.clearcoat = finish === 'polished' ? 0.6 : 0.1
+          c.material.clearcoatRoughness = finish === 'polished' ? 0.05 : 0.25
         }
-      })
-      if (onModelReady) onModelReady(gltf.scene)
-    }
-  }, [gltf, isMobile])
+        c.castShadow = true
+        c.receiveShadow = true
+      }
+    })
+  }, [gltf, finish, shine])
 
   return gltf ? <primitive ref={modelRef} object={gltf.scene} /> : null
 }
@@ -78,23 +80,24 @@ function OBJModel({ src, isMobile, onModelReady, finish = 'polished', shine = 1.
   })
 
   useEffect(() => {
-    if (obj) {
-      normalizeAndCenter(obj, isMobile ? 0.9 : 1.2)
-  obj.traverse((c) => {
-        if (c.isMesh) {
-          c.castShadow = true
-          c.receiveShadow = true
-          if (c.material) {
-    const { metalness, roughness } = finishParams(finish)
-    if ('metalness' in c.material) c.material.metalness = metalness
-    if ('roughness' in c.material) c.material.roughness = roughness
-    c.material.envMapIntensity = shine
-          }
-        }
-      })
-      if (onModelReady) onModelReady(obj)
-    }
-  }, [obj, isMobile])
+    if (!obj) return
+  normalizeAndCenter(obj, isMobile ? 0.6 : 0.9)
+    if (onModelReady) onModelReady(obj)
+  }, [obj])
+
+  useEffect(() => {
+    if (!obj) return
+    obj.traverse((c) => {
+      if (c.isMesh && c.material) {
+        const { metalness, roughness } = finishParams(finish)
+        if ('metalness' in c.material) c.material.metalness = metalness
+        if ('roughness' in c.material) c.material.roughness = roughness
+        c.material.envMapIntensity = shine
+        c.castShadow = true
+        c.receiveShadow = true
+      }
+    })
+  }, [obj, finish, shine])
 
   return obj ? <primitive ref={modelRef} object={obj} /> : null
 }
@@ -112,7 +115,7 @@ function NailsModel({ isMobile, onModelReady, finish = 'polished', shine = 1.2 }
   useEffect(() => {
     if (!groupRef.current) return
     // Normalize and center the group
-    normalizeAndCenter(groupRef.current, isMobile ? 0.9 : 1.2)
+  normalizeAndCenter(groupRef.current, isMobile ? 0.6 : 0.9)
     if (onModelReady) onModelReady(groupRef.current)
   }, [groupRef.current, isMobile])
 

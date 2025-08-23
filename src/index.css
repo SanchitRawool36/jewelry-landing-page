@@ -3,15 +3,29 @@
 @tailwind utilities;
 
 html,body,#root{height:100%}
-body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+body{
+	font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;
+	padding-top: env(safe-area-inset-top, 0px);
+	padding-right: env(safe-area-inset-right, 0px);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+	padding-left: env(safe-area-inset-left, 0px);
+	-webkit-tap-highlight-color: transparent;
+}
 
 /* small helper to keep canvas full height */
-.viewer-root{height:calc(100vh - 64px);min-height:480px}
+.viewer-root{height:calc(100vh - 64px);min-height:420px}
+@supports (height: 100dvh){
+	.viewer-root{ height: calc(100dvh - 64px); }
+}
+@media (max-width: 480px){
+	.viewer-root{ min-height: 360px; }
+}
 
 /* 2D, flat UI primitives using Tailwind's @apply */
 @layer components{
 	.card{ @apply bg-white/90 backdrop-blur rounded-md border border-slate-200; }
-	.btn{ @apply inline-flex items-center justify-center px-4 py-2 rounded border border-slate-300 text-sm font-medium text-slate-800 bg-white active:translate-y-px min-h-[44px]; }
+	.btn{ @apply inline-flex items-center justify-center px-4 py-2 rounded border border-slate-300 text-sm font-medium text-slate-800 bg-white min-h-[44px]; }
+	.btn:active { transform: translateY(1px); }
 	.btn-primary{ @apply bg-black text-white border-black; }
 	.btn-ghost{ @apply bg-transparent border-transparent text-slate-700; }
 	.chip{ @apply inline-flex items-center px-2.5 py-1 rounded-full border border-slate-300 text-xs md:text-sm bg-white; }
@@ -19,9 +33,14 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'
 	.segmented .seg-btn{ @apply px-3 py-2 rounded text-sm min-h-[44px]; }
 	.segmented .seg-btn[aria-pressed="true"]{ @apply bg-black text-white; }
 	.sheet{ @apply fixed inset-x-0 bottom-0 p-3 pt-2; padding-bottom: calc(env(safe-area-inset-bottom,0px) + 12px); }
+	.sheet .card{ max-height: min(80vh, 80dvh); overflow: auto; }
 }
 
 /* Prefer reduced motion */
 @media (prefers-reduced-motion: reduce){
 	*{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
 }
+
+/* Touch helpers */
+.touch-pan-y{ touch-action: pan-y; }
+.overscroll-contain{ overscroll-behavior: contain; }

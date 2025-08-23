@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useState, useMemo, Suspense } from 'react'
+import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Environment, Html, useProgress, ContactShadows } from '@react-three/drei'
+import { OrbitControls, Environment, Html, ContactShadows } from '@react-three/drei'
 import Model from './Model'
 import CameraController from './CameraController'
 import TryOn from './TryOn'
 
 function Loader(){
-  const { progress } = useProgress()
-  return <Html center>{progress.toFixed(0)}% loading</Html>
+  return <Html center>Loading…</Html>
 }
 
 export default function Viewer({ product, products, onSelect }){
@@ -20,6 +20,8 @@ export default function Viewer({ product, products, onSelect }){
   const [finish, setFinish] = useState('polished') // polished | satin | matte
   const [shine, setShine] = useState(1.2) // env intensity multiplier
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [envMode, setEnvMode] = useState('preset') // 'files' | 'preset'
+  const envHdrPath = '/assets/env/studio_2k.hdr'
 
   useEffect(()=>{
     const mq = window.matchMedia('(max-width:900px)')
@@ -36,7 +38,32 @@ export default function Viewer({ product, products, onSelect }){
     return ()=>{ mq.removeEventListener('change', update); if(containerRef.current) obs.disconnect() }
   },[])
 
+  // Prefer local HDRI if valid; fallback to preset if missing or malformed
+  useEffect(() => {
+    let cancelled = false
+    async function probeHDR(url){
+      try {
+        const res = await fetch(url)
+        if (!res.ok) return false
+        const buf = await res.arrayBuffer()
+        const bytes = new Uint8Array(buf.slice(0, 16))
+        const header = Array.from(bytes).map(b=>String.fromCharCode(b)).join('')
+        // Radiance .hdr files start with "#?RADIANCE" or similar
+        return header.includes('#?RADIANCE') || header.includes('RADIANCE')
+      } catch { return false }
+    }
+    probeHDR(envHdrPath).then(valid => { if (!cancelled) setEnvMode(valid ? 'files' : 'preset') })
+    return () => { cancelled = true }
+  }, [])
+
   const selected = product || products[0]
+
+  // When selection changes, adopt its defaults if provided
+  useEffect(() => {
+    if (!selected) return
+    if (selected.defaultFinish) setFinish(selected.defaultFinish)
+    if (selected.envMapIntensity) setShine(selected.envMapIntensity)
+  }, [selected?.id])
 
   return (
     <div className="viewer-root" ref={containerRef} style={{position:'relative'}}>
@@ -45,7 +72,12 @@ export default function Viewer({ product, products, onSelect }){
           shadows
           dpr={Math.min(2, window.devicePixelRatio)}
           camera={{ fov: isMobile ? 45 : 35, position: [0, 0, 3] }}
-          gl={{ physicallyCorrectLights: true }}
+          gl={{
+            physicallyCorrectLights: true,
+            outputColorSpace: THREE.SRGBColorSpace,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1
+          }}
         >
           <ambientLight intensity={0.5} />
           <directionalLight position={[5, 8, 4]} intensity={0.9} castShadow />
@@ -53,7 +85,11 @@ export default function Viewer({ product, products, onSelect }){
           <pointLight position={[3, -1, -2]} intensity={0.5} />
 
           <Suspense fallback={<Loader />}>
-            <Environment preset="studio" />
+            {envMode === 'files' ? (
+              <Environment key="hdr-files" files={envHdrPath} background={false} blur={0.05} rotation={[0, Math.PI/4, 0]} />
+            ) : (
+              <Environment key="hdr-preset" preset="studio" background={false} blur={0.05} rotation={[0, Math.PI/4, 0]} />
+            )}
             <Model
               src={selected?.src}
               low={selected?.low}
@@ -63,7 +99,7 @@ export default function Viewer({ product, products, onSelect }){
               productId={selected?.id}
               onModelReady={(m) => setOverlayModel(m)}
             />
-            <ContactShadows position={[0, -0.6, 0]} opacity={0.35} blur={2.4} scale={6} far={3} />
+            <ContactShadows position={[0, -0.6, 0]} opacity={0.3} blur={2.5} scale={6} far={3} />
           </Suspense>
           <OrbitControls
             enablePan={false}
