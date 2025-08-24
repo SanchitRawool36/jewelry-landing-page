@@ -11,6 +11,9 @@ body{
 	padding-left: env(safe-area-inset-left, 0px);
 	-webkit-tap-highlight-color: transparent;
 }
+html{ scroll-behavior: smooth; }
+/* Ensure anchored sections aren’t hidden under the header */
+:target{ scroll-margin-top: 80px; }
 
 /* small helper to keep canvas full height */
 .viewer-root{height:calc(100vh - 64px);min-height:420px}

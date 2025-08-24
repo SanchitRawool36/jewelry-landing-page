@@ -16,53 +16,101 @@ function normalizeAndCenter(gltfScene, targetSize = 1.2){
   gltfScene.position.sub(center)
 }
 
-export default function Model({ src, low, isMobile, onModelReady, finish = 'polished', shine = 1.2 }){
+// Ensure a mesh uses a PBR material so finish controls (metalness/roughness) work.
+function ensurePhysicalMaterial(mesh) {
+  if (!mesh || !mesh.material) return
+  const mat = mesh.material
+  // Handle multi-material meshes
+  if (Array.isArray(mat)) {
+    mesh.material = mat.map((m) => toPhysical(m))
+    return
+  }
+  if (!mat.isMeshPhysicalMaterial && !mat.isMeshStandardMaterial) {
+    mesh.material = toPhysical(mat)
+  }
+}
+
+function toPhysical(oldMat) {
+  // Reuse common texture slots if present
+  const phys = new THREE.MeshPhysicalMaterial({
+    color: oldMat.color ? oldMat.color.clone() : new THREE.Color('#d4af37'),
+    map: oldMat.map || null,
+    normalMap: oldMat.normalMap || null,
+    roughnessMap: oldMat.roughnessMap || null,
+    metalnessMap: oldMat.metalnessMap || null,
+    aoMap: oldMat.aoMap || null,
+    emissiveMap: oldMat.emissiveMap || null,
+    envMap: oldMat.envMap || null,
+    transparent: !!oldMat.transparent,
+    opacity: oldMat.opacity !== undefined ? oldMat.opacity : 1,
+    side: oldMat.side !== undefined ? oldMat.side : THREE.FrontSide,
+  })
+  // Dispose the old material to free GPU memory
+  if (typeof oldMat.dispose === 'function') {
+    oldMat.dispose()
+  }
+  return phys
+}
+
+export default function Model({ src, low, isMobile, onModelReady, finish = 'polished', shine = 1.2, clearcoat = 0.6, clearcoatRoughness = 0.08, displayScale = 1.0 }){
   // Delegate to specific components to honor hooks rules
   if (typeof src === 'string' && src.toLowerCase().endsWith('.glb')) {
-  return <GLBModel src={src} low={low} isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
+    return <GLBModel src={src} low={low} isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} clearcoat={clearcoat} clearcoatRoughness={clearcoatRoughness} displayScale={displayScale} />
   }
   if (src && typeof src === 'object' && src.obj && src.mtl) {
-  return <OBJModel src={src} isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
+    return <OBJModel src={src} isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} clearcoat={clearcoat} clearcoatRoughness={clearcoatRoughness} displayScale={displayScale} />
   }
   if (src && typeof src === 'object' && src.builtin === 'nails') {
-    return <NailsModel isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} />
+    return <NailsModel isMobile={isMobile} onModelReady={onModelReady} finish={finish} shine={shine} clearcoat={clearcoat} clearcoatRoughness={clearcoatRoughness} displayScale={displayScale} />
   }
   return null
 }
 
-function GLBModel({ src, low, isMobile, onModelReady, finish = 'polished', shine = 1.2 }){
+function GLBModel({ src, low, isMobile, onModelReady, finish = 'polished', shine = 1.2, clearcoat = 0.6, clearcoatRoughness = 0.08, displayScale = 1.0 }){
   const modelRef = useRef()
   const gltf = useGLTF(isMobile && low ? low : src)
 
   useEffect(() => {
     if (!gltf || !gltf.scene) return
     // Normalize and center once per model instance or device class change
-  normalizeAndCenter(gltf.scene, isMobile ? 0.6 : 0.9)
+    normalizeAndCenter(gltf.scene, (isMobile ? 0.6 : 0.9) * displayScale)
     if (onModelReady) onModelReady(gltf.scene)
-  }, [gltf])
+  }, [gltf, displayScale, isMobile])
 
   useEffect(() => {
     if (!gltf || !gltf.scene) return
     gltf.scene.traverse((c) => {
       if (c.isMesh && c.material) {
+  // GLB should already be PBR, but just in case for odd assets
+  ensurePhysicalMaterial(c)
         const { metalness, roughness } = finishParams(finish)
-        if ('metalness' in c.material) c.material.metalness = metalness
-        if ('roughness' in c.material) c.material.roughness = roughness
-        c.material.envMapIntensity = shine
-        if ('clearcoat' in c.material) {
-          c.material.clearcoat = finish === 'polished' ? 0.6 : 0.1
-          c.material.clearcoatRoughness = finish === 'polished' ? 0.05 : 0.25
+        if (Array.isArray(c.material)) {
+          c.material.forEach((m) => {
+            if ('metalness' in m) m.metalness = metalness
+            if ('roughness' in m) m.roughness = roughness
+            if ('envMapIntensity' in m) m.envMapIntensity = shine
+            if ('clearcoat' in m) m.clearcoat = clearcoat
+            if ('clearcoatRoughness' in m) m.clearcoatRoughness = clearcoatRoughness
+            m.needsUpdate = true
+          })
+        } else {
+          if ('metalness' in c.material) c.material.metalness = metalness
+          if ('roughness' in c.material) c.material.roughness = roughness
+          if ('envMapIntensity' in c.material) c.material.envMapIntensity = shine
+          if ('clearcoat' in c.material) c.material.clearcoat = clearcoat
+          if ('clearcoatRoughness' in c.material) c.material.clearcoatRoughness = clearcoatRoughness
+          c.material.needsUpdate = true
         }
         c.castShadow = true
         c.receiveShadow = true
       }
     })
-  }, [gltf, finish, shine])
+  }, [gltf, finish, shine, clearcoat, clearcoatRoughness])
 
   return gltf ? <primitive ref={modelRef} object={gltf.scene} /> : null
 }
 
-function OBJModel({ src, isMobile, onModelReady, finish = 'polished', shine = 1.2 }){
+function OBJModel({ src, isMobile, onModelReady, finish = 'polished', shine = 1.2, clearcoat = 0.6, clearcoatRoughness = 0.08, displayScale = 1.0 }){
   const modelRef = useRef()
   const mtlUrl = src.mtl
   const objUrl = src.obj
@@ -81,43 +129,66 @@ function OBJModel({ src, isMobile, onModelReady, finish = 'polished', shine = 1.
 
   useEffect(() => {
     if (!obj) return
-  normalizeAndCenter(obj, isMobile ? 0.6 : 0.9)
+    normalizeAndCenter(obj, (isMobile ? 0.6 : 0.9) * displayScale)
     if (onModelReady) onModelReady(obj)
-  }, [obj])
+  }, [obj, displayScale, isMobile])
 
   useEffect(() => {
     if (!obj) return
     obj.traverse((c) => {
       if (c.isMesh && c.material) {
+  // Upgrade Phong (from MTL) to Physical so finish works
+  ensurePhysicalMaterial(c)
         const { metalness, roughness } = finishParams(finish)
-        if ('metalness' in c.material) c.material.metalness = metalness
-        if ('roughness' in c.material) c.material.roughness = roughness
-        c.material.envMapIntensity = shine
+        if (Array.isArray(c.material)) {
+          c.material.forEach((m) => {
+            if ('metalness' in m) m.metalness = metalness
+            if ('roughness' in m) m.roughness = roughness
+            if ('envMapIntensity' in m) m.envMapIntensity = shine
+            if ('clearcoat' in m) m.clearcoat = clearcoat
+            if ('clearcoatRoughness' in m) m.clearcoatRoughness = clearcoatRoughness
+            m.needsUpdate = true
+          })
+        } else {
+          if ('metalness' in c.material) c.material.metalness = metalness
+          if ('roughness' in c.material) c.material.roughness = roughness
+          if ('envMapIntensity' in c.material) c.material.envMapIntensity = shine
+          if ('clearcoat' in c.material) c.material.clearcoat = clearcoat
+          if ('clearcoatRoughness' in c.material) c.material.clearcoatRoughness = clearcoatRoughness
+          c.material.needsUpdate = true
+        }
         c.castShadow = true
         c.receiveShadow = true
       }
     })
-  }, [obj, finish, shine])
+  }, [obj, finish, shine, clearcoat, clearcoatRoughness])
 
   return obj ? <primitive ref={modelRef} object={obj} /> : null
 }
 
 function finishParams(finish){
   switch(finish){
-    case 'matte': return { metalness: 0.5, roughness: 0.6 }
-    case 'satin': return { metalness: 0.8, roughness: 0.3 }
-    default: return { metalness: 1.0, roughness: 0.15 }
+    case 'matte':
+      // Soft, diffuse look
+      return { metalness: 0.9, roughness: 0.7 }
+    case 'satin':
+      // Brushed look
+      return { metalness: 1.0, roughness: 0.35 }
+    case 'polished':
+    default:
+      // Shiny, mirror-like
+      return { metalness: 1.0, roughness: 0.08 }
   }
 }
 
-function NailsModel({ isMobile, onModelReady, finish = 'polished', shine = 1.2 }){
+function NailsModel({ isMobile, onModelReady, finish = 'polished', shine = 1.2, clearcoat = 0.6, clearcoatRoughness = 0.08, displayScale = 1.0 }){
   const groupRef = useRef()
   useEffect(() => {
     if (!groupRef.current) return
     // Normalize and center the group
-  normalizeAndCenter(groupRef.current, isMobile ? 0.6 : 0.9)
+    normalizeAndCenter(groupRef.current, (isMobile ? 0.6 : 0.9) * displayScale)
     if (onModelReady) onModelReady(groupRef.current)
-  }, [groupRef.current, isMobile])
+  }, [groupRef.current, displayScale, isMobile])
 
   const { roughness } = finishParams(finish)
   const color = '#f5c6c6' // light blush nail color
@@ -132,7 +203,7 @@ function NailsModel({ isMobile, onModelReady, finish = 'polished', shine = 1.2 }
           <mesh key={i} position={[x, 0, 0]} rotation={[-0.1 + i*0.02, 0, 0]} castShadow receiveShadow>
             {/* Capsule: radius, length, capSegments, radialSegments */}
             <capsuleGeometry args={[rad, len, 6, 12]} />
-            <meshPhysicalMaterial color={color} metalness={0} roughness={Math.min(0.6, roughness + 0.2)} clearcoat={0.6} clearcoatRoughness={0.1} envMapIntensity={shine} />
+            <meshPhysicalMaterial color={color} metalness={0} roughness={Math.min(0.6, roughness + 0.2)} clearcoat={clearcoat} clearcoatRoughness={clearcoatRoughness} envMapIntensity={shine} />
           </mesh>
         )
       })}

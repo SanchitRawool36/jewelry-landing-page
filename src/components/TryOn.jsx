@@ -7,13 +7,14 @@ export default function TryOn({ productId, sourceModel, onClose }){
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [running, setRunning] = useState(false)
-  const overlayRef = useRef({ scene: null, camera: null, renderer: null, model: null, faceMesh: null, mpCamera: null, onResize: null, animating: false })
+  const overlayRef = useRef({ scene: null, camera: null, renderer: null, model: null, faceMesh: null, mpCamera: null, onResize: null, animating: false, debugPoints: null, debugLines: null, connections: null })
   const startingRef = useRef(false)
   const rafRef = useRef(0)
 
   const [errorMsg, setErrorMsg] = useState(null)
   // Smoothing state
-  const smoothRef = useRef({ pos: new THREE.Vector3(0,0,0), scale: 1, t: performance.now() })
+  const smoothRef = useRef({ pos: new THREE.Vector3(0,0,0), scale: 1, rot: new THREE.Quaternion(), t: performance.now() })
+  const [showMesh, setShowMesh] = useState(false)
 
   // Helper to resolve MediaPipe classes from ESM and/or window globals
   function resolveFaceMeshClass(mod){
@@ -107,7 +108,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
       canvasRef.current.appendChild(renderer.domElement)
     }
 
-    const scene = new THREE.Scene()
+  const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(50, initialW/initialH, 0.1, 1000)
     camera.position.set(0,0,3)
 
@@ -115,6 +116,26 @@ export default function TryOn({ productId, sourceModel, onClose }){
     const cloned = sourceModel.clone(true)
     cloned.traverse(n=>{ if(n.isMesh){ n.castShadow = false; n.frustumCulled = false }})
     scene.add(cloned)
+
+    // Optional: debug landmark points/lines (visibility toggled later)
+    {
+      const geom = new THREE.BufferGeometry()
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(468 * 3), 3))
+      const pts = new THREE.Points(geom, new THREE.PointsMaterial({ color: 0xffcc00, size: 0.01 }))
+      scene.add(pts)
+      overlayRef.current.debugPoints = pts
+      pts.visible = false
+    }
+    // Lines for tessellation if available
+    {
+      const geom = new THREE.BufferGeometry()
+      // allocate a generous buffer; will resize when connections known
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(468 * 2 * 3), 3))
+      const lines = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color: 0x00a2ff, linewidth: 1 }))
+      scene.add(lines)
+      overlayRef.current.debugLines = lines
+      lines.visible = false
+    }
 
     // Store overlay refs
     overlayRef.current.scene = scene
@@ -139,6 +160,12 @@ export default function TryOn({ productId, sourceModel, onClose }){
     // Init face mesh
     const faceMesh = new FaceMeshCls({locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`})
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 })
+    // Capture tessellation connections if exported by module/globals
+    try {
+      const mod = await import('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js')
+      const connections = mod?.FACEMESH_TESSELATION || (window.FACEMESH_TESSELATION || null)
+      if (connections && Array.isArray(connections)) overlayRef.current.connections = connections
+    } catch {}
     faceMesh.onResults((res)=>onFaceResults(res, productId))
     overlayRef.current.faceMesh = faceMesh
 
@@ -204,12 +231,93 @@ export default function TryOn({ productId, sourceModel, onClose }){
     const dt = (now - smoothRef.current.t) / 1000
     smoothRef.current.t = now
 
+    // Prepare convenient landmark vectors (normalized to our overlay space)
+  const toVec3 = (p) => new THREE.Vector3((p.x - 0.5) * 2, -(p.y - 0.5) * 2, (p.z || 0) * 2)
+    const lEyeOuter = toVec3(lm[33])
+    const rEyeOuter = toVec3(lm[263])
+    const midEye = lEyeOuter.clone().add(rEyeOuter).multiplyScalar(0.5)
+    const nose = toVec3(lm[1])
+    const chin = toVec3(lm[152])
+    const leftEar = lm[234] ? toVec3(lm[234]) : lEyeOuter
+    const rightEar = lm[454] ? toVec3(lm[454]) : rEyeOuter
+
+    // Optional: update debug points
+    if (or.debugPoints && or.debugPoints.visible) {
+      const arr = or.debugPoints.geometry.attributes.position.array
+      for (let i = 0; i < 468; i++) {
+        const p = lm[i]
+        const v = toVec3(p)
+        arr[i*3+0] = v.x
+        arr[i*3+1] = v.y
+        arr[i*3+2] = v.z
+      }
+      or.debugPoints.geometry.attributes.position.needsUpdate = true
+    }
+    if (or.debugLines && or.debugLines.visible && or.connections) {
+      const pos = or.debugLines.geometry.attributes.position
+      const arr = pos.array
+      const conns = or.connections
+      // Ensure buffer large enough
+      const required = conns.length * 2 * 3
+      if (arr.length < required) {
+        or.debugLines.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(required), 3))
+      }
+      let idx = 0
+      for (let i = 0; i < conns.length; i++) {
+        const [a, b] = conns[i]
+        const va = toVec3(lm[a])
+        const vb = toVec3(lm[b])
+        arr[idx++] = va.x; arr[idx++] = va.y; arr[idx++] = va.z
+        arr[idx++] = vb.x; arr[idx++] = vb.y; arr[idx++] = vb.z
+      }
+      or.debugLines.geometry.setDrawRange(0, conns.length * 2)
+      or.debugLines.geometry.attributes.position.needsUpdate = true
+    }
+
+    // Compute head orientation basis from eyes and nose
+    // x-axis: from right eye to left eye; y-axis: approx from nose to eyes; z-axis: cross
+    let xAxis = rEyeOuter.clone().sub(lEyeOuter).multiplyScalar(-1) // left-to-right
+    if (xAxis.lengthSq() < 1e-6) xAxis = new THREE.Vector3(1,0,0)
+    xAxis.normalize()
+    let yApprox = midEye.clone().sub(nose) // up-ish
+    if (yApprox.lengthSq() < 1e-6) yApprox = new THREE.Vector3(0,1,0)
+    yApprox.normalize()
+    let zAxis = new THREE.Vector3().crossVectors(xAxis, yApprox)
+    if (zAxis.lengthSq() < 1e-6) zAxis = new THREE.Vector3(0,0,1)
+    zAxis.normalize()
+    let yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize()
+
+    const rotMat = new THREE.Matrix4()
+    rotMat.makeBasis(xAxis, yAxis, zAxis) // columns are x,y,z axes
+    const targetQuat = new THREE.Quaternion().setFromRotationMatrix(rotMat)
+
+    // Optional per-product rotation offset (Euler degrees)
+    if (preset.rotationOffset) {
+      const e = new THREE.Euler(
+        THREE.MathUtils.degToRad(preset.rotationOffset.x || 0),
+        THREE.MathUtils.degToRad(preset.rotationOffset.y || 0),
+        THREE.MathUtils.degToRad(preset.rotationOffset.z || 0),
+        'XYZ'
+      )
+      const qOff = new THREE.Quaternion().setFromEuler(e)
+      targetQuat.multiply(qOff)
+    }
+
+    // Smooth rotation (slerp)
+    if (!smoothRef.current.rot || smoothRef.current.rot.w === 0) {
+      smoothRef.current.rot = targetQuat.clone()
+    } else {
+      const alphaR = 0.25
+      const kR = 1 - Math.pow(1 - alphaR, Math.max(1, dt*60))
+      smoothRef.current.rot.slerp(targetQuat, kR)
+    }
+
+    or.model.quaternion.copy(smoothRef.current.rot)
+
     // anchor by nose for neck, by ear for earrings
     if (preset.attach === 'neck'){
-      const nose = lm[1]
-      const x = (nose.x - 0.5) * 2
-      const y = -(nose.y - 0.5) * 2
-  const targetPos = new THREE.Vector3(x + preset.offset.x, y + preset.offset.y, preset.offset.z)
+      const x = nose.x; const y = nose.y // already converted above
+      const targetPos = new THREE.Vector3((x - 0.5) * 2 + preset.offset.x, -(y - 0.5) * 2 + preset.offset.y, preset.offset.z)
   // Smooth position with exponential lerp
   const alpha = 0.22
   const k = 1 - Math.pow(1 - alpha, Math.max(1, dt*60))
@@ -219,8 +327,10 @@ export default function TryOn({ productId, sourceModel, onClose }){
       const left = lm[234] || lm[33]
       const right = lm[454] || lm[263]
       if (left && right){
-        const dist = Math.hypot(left.x - right.x, left.y - right.y)
-  const rawS = THREE.MathUtils.clamp(dist * 3.5 * preset.scale, 0.4, 3)
+        const vL = toVec3(left)
+        const vR = toVec3(right)
+        const dist3 = vL.distanceTo(vR)
+        const rawS = THREE.MathUtils.clamp(dist3 * 3.5 * preset.scale, 0.35, 3)
   const kS = 1 - Math.pow(1 - 0.2, Math.max(1, dt*60))
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
@@ -232,15 +342,17 @@ export default function TryOn({ productId, sourceModel, onClose }){
       if (left){
         const x = (left.x - 0.5) * 2
         const y = -(left.y - 0.5) * 2
-  const targetPos = new THREE.Vector3(x + preset.offset.x, y + preset.offset.y, preset.offset.z)
+        const targetPos = new THREE.Vector3(x + preset.offset.x, y + preset.offset.y, preset.offset.z)
   const alpha = 0.22
   const k = 1 - Math.pow(1 - alpha, Math.max(1, dt*60))
   smoothRef.current.pos.lerp(targetPos, k)
   or.model.position.copy(smoothRef.current.pos)
       }
       if (left && right){
-        const dist = Math.hypot(left.x - right.x, left.y - right.y)
-  const rawS = THREE.MathUtils.clamp(dist * 3.8 * preset.scale, 0.35, 2.5)
+        const vL = toVec3(left)
+        const vR = toVec3(right)
+        const dist3 = vL.distanceTo(vR)
+        const rawS = THREE.MathUtils.clamp(dist3 * 3.8 * preset.scale, 0.3, 2.5)
   const kS = 1 - Math.pow(1 - 0.2, Math.max(1, dt*60))
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
@@ -252,7 +364,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
     const or = overlayRef.current
     if (!or || !or.renderer || !or.animating) return
     rafRef.current = requestAnimationFrame(renderLoop)
-    if (or.model) or.model.rotation.y += 0.005
+  // Anchored model orientation comes from head pose
     or.renderer.render(or.scene, or.camera)
   }
 
@@ -260,8 +372,19 @@ export default function TryOn({ productId, sourceModel, onClose }){
     <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
       <video ref={videoRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none',zIndex:0}} autoPlay playsInline muted></video>
       <div ref={canvasRef} style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:1}} />
-      <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2}}>
+      <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2, display:'flex', gap:8}}>
         <button onClick={() => { onClose(); }} className="btn" aria-label="Close camera">Close Camera</button>
+        <button onClick={() => {
+          setShowMesh((v)=>{
+            const next = !v
+            const or = overlayRef.current
+            if (or) {
+              if (or.debugPoints) or.debugPoints.visible = next
+              if (or.debugLines) or.debugLines.visible = next
+            }
+            return next
+          })
+        }} className="btn" aria-label="Toggle face mesh">{showMesh ? 'Hide Mesh' : 'Show Mesh'}</button>
       </div>
   {/* Start button removed: camera starts automatically when overlay opens */}
       {errorMsg && (

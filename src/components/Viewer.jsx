@@ -96,10 +96,19 @@ export default function Viewer({ product, products, onSelect }){
               isMobile={isMobile}
               finish={finish}
               shine={shine}
+              clearcoat={selected?.clearcoat}
+              clearcoatRoughness={selected?.clearcoatRoughness}
+              displayScale={selected?.displayScale}
               productId={selected?.id}
               onModelReady={(m) => setOverlayModel(m)}
             />
-            <ContactShadows position={[0, -0.6, 0]} opacity={0.3} blur={2.5} scale={6} far={3} />
+            <ContactShadows
+              position={[0, -0.6, 0]}
+              opacity={selected?.shadow?.opacity ?? 0.3}
+              blur={2.5}
+              scale={selected?.shadow?.scale ?? 6}
+              far={3}
+            />
           </Suspense>
           <OrbitControls
             enablePan={false}
@@ -158,17 +167,29 @@ export default function Viewer({ product, products, onSelect }){
                   </button>
                 ))}
               </div>
-              <div className="mt-3">
-                <label className="text-sm font-medium">Shine</label>
-                <input
-                  type="range"
-                  min="0.6"
-                  max="2"
-                  step="0.05"
-                  value={shine}
-                  onChange={(e) => setShine(parseFloat(e.target.value))}
-                  className="w-full"
+              <div className="mt-3 relative rounded-md overflow-hidden">
+                {/* Soft Dark Yellow Glow behind Shine */}
+                <div
+                  className="absolute inset-0 z-0"
+                  style={{
+                    backgroundImage: 'radial-gradient(circle at center, #ccb755 0%, transparent 70%)',
+                    opacity: 0.6,
+                    mixBlendMode: 'multiply',
+                    pointerEvents: 'none',
+                  }}
                 />
+                <div className="relative z-10">
+                  <label className="text-sm font-medium">Shine</label>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="3"
+                    step="0.01"
+                    value={shine}
+                    onChange={(e) => setShine(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
               </div>
                 {/* Snapshot (2D) feature removed */}
             </div>
@@ -231,17 +252,29 @@ export default function Viewer({ product, products, onSelect }){
                               </button>
                             ))}
                           </div>
-                          <div className="mt-3">
-                            <label className="text-sm font-medium">Shine</label>
-                            <input
-                              type="range"
-                              min="0.6"
-                              max="2"
-                              step="0.05"
-                              value={shine}
-                              onChange={(e) => setShine(parseFloat(e.target.value))}
-                              className="w-full"
+                          <div className="mt-3 relative rounded-md overflow-hidden">
+                            {/* Soft Dark Yellow Glow behind Shine (mobile) */}
+                            <div
+                              className="absolute inset-0 z-0"
+                              style={{
+                                backgroundImage: 'radial-gradient(circle at center, #ccb755 0%, transparent 70%)',
+                                opacity: 0.6,
+                                mixBlendMode: 'multiply',
+                                pointerEvents: 'none',
+                              }}
                             />
+                            <div className="relative z-10">
+                              <label className="text-sm font-medium">Shine</label>
+                              <input
+                                type="range"
+                                min="0.2"
+                                max="3"
+                                step="0.01"
+                                value={shine}
+                                onChange={(e) => setShine(parseFloat(e.target.value))}
+                                className="w-full"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

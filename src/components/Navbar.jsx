@@ -1,38 +1,72 @@
-import React, {useState} from 'react'
+import React from 'react'
+import ShinyText from './ShinyText'
+import GooeyNav from './GooeyNav'
 
 export default function Navbar(){
-  const [open, setOpen] = useState(false)
   return (
-  <header className="bg-white shadow-sm py-4 px-4 md:px-8 flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <div className="font-bold text-lg">Aura Jewelers</div>
-        <nav className="hidden md:flex gap-4 text-sm text-slate-700">
-          <a href="#" className="hover:underline">Products</a>
-          <a href="#" className="hover:underline">About</a>
-          <a href="#" className="hover:underline">Contact</a>
-        </nav>
-      </div>
+    <header className="relative py-4 px-4 md:px-8 overflow-hidden bg-black">
+      {/* Prismatic Aurora Burst - Multi-layered Gradient */}
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 120% 80% at 70% 20%, rgba(255, 20, 147, 0.15), transparent 50%),
+            radial-gradient(ellipse 100% 60% at 30% 10%, rgba(0, 255, 255, 0.12), transparent 60%),
+            radial-gradient(ellipse 90% 70% at 50% 0%, rgba(138, 43, 226, 0.18), transparent 65%),
+            radial-gradient(ellipse 110% 50% at 80% 30%, rgba(255, 215, 0, 0.08), transparent 40%),
+            #000000
+          `,
+          pointerEvents: 'none',
+        }}
+      />
 
-      <div className="flex items-center gap-3">
-        <div className="hidden md:block text-sm text-slate-600">Free shipping over 1000rs</div>
-        <button className="md:hidden btn btn-ghost p-2" onClick={()=>setOpen(v=>!v)} aria-label="menu">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#0b2545" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      </div>
+      <div className="relative z-10">
+        {/* Top row: brand and desktop nav */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="font-bold text-lg">
+            <ShinyText text="Aura Jewelers" speed={4} baseColor="#ffffff" />
+          </div>
+          <div className="hidden md:block">
+            <div style={{ height: 64, display: 'flex', alignItems: 'center' }}>
+              <GooeyNav
+                items={[
+                  { label: 'Products', href: '#products' },
+                  { label: 'About', href: '#about' },
+                  { label: 'Contact', href: '#contact' },
+                ]}
+                particleCount={12}
+                particleDistances={[90, 10]}
+                particleR={100}
+                initialActiveIndex={0}
+                animationTime={600}
+                timeVariance={300}
+                colors={[1,2,3,1,2,3,1,4]}
+              />
+            </div>
+          </div>
+          <div className="hidden md:block text-sm text-slate-300">Free shipping over 1000rs</div>
+        </div>
 
-      {/* mobile drawer */}
-      {open && (
-        <div className="fixed inset-0 z-50 bg-black/40">
-          <div className="absolute right-0 top-0 card w-64 h-full p-4">
-            <button className="btn mb-4" onClick={()=>setOpen(false)}>Close</button>
-            <nav className="flex flex-col gap-3 text-slate-700">
-              <a className="btn btn-ghost justify-start" href="#">Products</a>
-              <a className="btn btn-ghost justify-start" href="#">About</a>
-              <a className="btn btn-ghost justify-start" href="#">Contact</a>
-            </nav>
+        {/* Mobile full-width GooeyNav */}
+        <div className="md:hidden w-full mt-3">
+          <div style={{ height: 80, position: 'relative', borderRadius: 12, padding: '8px 12px' }}>
+            <GooeyNav
+              items={[
+                { label: 'Products', href: '#products' },
+                { label: 'About', href: '#about' },
+                { label: 'Contact', href: '#contact' },
+              ]}
+              particleCount={10}
+              particleDistances={[80, 10]}
+              particleR={80}
+              initialActiveIndex={0}
+              animationTime={600}
+              timeVariance={300}
+              colors={[1,2,3,1,2,3,1,4]}
+            />
           </div>
         </div>
-      )}
+      </div>
     </header>
   )
 }
