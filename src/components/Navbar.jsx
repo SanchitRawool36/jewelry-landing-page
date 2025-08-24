@@ -4,7 +4,7 @@ import GooeyNav from './GooeyNav'
 
 export default function Navbar(){
   return (
-    <header className="relative py-4 px-4 md:px-8 overflow-hidden bg-black">
+  <header className="sticky top-0 z-50 relative py-4 px-4 md:px-8 overflow-hidden bg-black border-b border-white/10">
       {/* Prismatic Aurora Burst - Multi-layered Gradient */}
       <div
         className="absolute inset-0 z-0"

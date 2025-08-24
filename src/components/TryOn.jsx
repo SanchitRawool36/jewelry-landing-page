@@ -12,9 +12,15 @@ export default function TryOn({ productId, sourceModel, onClose }){
   const rafRef = useRef(0)
 
   const [errorMsg, setErrorMsg] = useState(null)
+  const [status, setStatus] = useState('Initializing camera…')
+  const lastResultRef = useRef(0)
+  const statusRef = useRef(status)
   // Smoothing state
   const smoothRef = useRef({ pos: new THREE.Vector3(0,0,0), scale: 1, rot: new THREE.Quaternion(), t: performance.now() })
   const [showMesh, setShowMesh] = useState(false)
+
+  // mirror status into a ref to minimize unnecessary re-renders inside tight loops
+  useEffect(() => { statusRef.current = status }, [status])
 
   // Helper to resolve MediaPipe classes from ESM and/or window globals
   function resolveFaceMeshClass(mod){
@@ -68,7 +74,10 @@ export default function TryOn({ productId, sourceModel, onClose }){
     if (!productId || !sourceModel) return false
     if (startingRef.current || running) return false
     startingRef.current = true
-    setErrorMsg(null)
+  setErrorMsg(null)
+  setStatus('Loading camera modules…')
+  // reset last detection timestamp
+  lastResultRef.current = 0
 
     // Load MediaPipe ESM modules from CDN
     let FaceMeshCls, CameraCls
@@ -97,11 +106,15 @@ export default function TryOn({ productId, sourceModel, onClose }){
     }
 
     // Create overlay renderer with provisional size; will correct on metadata/resize
-    const initialW = window.innerWidth
-    const initialH = window.innerHeight
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
-    renderer.setSize(initialW, initialH)
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
+  const initialW = window.innerWidth
+  const initialH = window.innerHeight
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+  renderer.setSize(initialW, initialH)
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1
+  renderer.physicallyCorrectLights = true
     // Clear previous canvas if any
     if (canvasRef.current) {
       while (canvasRef.current.firstChild) canvasRef.current.removeChild(canvasRef.current.firstChild)
@@ -109,13 +122,27 @@ export default function TryOn({ productId, sourceModel, onClose }){
     }
 
   const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(50, initialW/initialH, 0.1, 1000)
+    // Orthographic camera aligned to normalized device coordinates
+    const aspect = initialW / initialH
+    const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.01, 100)
     camera.position.set(0,0,3)
 
     // Clone provided model
     const cloned = sourceModel.clone(true)
     cloned.traverse(n=>{ if(n.isMesh){ n.castShadow = false; n.frustumCulled = false }})
     scene.add(cloned)
+
+    // Add a simple light rig for shiny PBR materials
+    {
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 0.6)
+      scene.add(hemi)
+      const key = new THREE.DirectionalLight(0xffffff, 1.0)
+      key.position.set(2, 3, 2)
+      scene.add(key)
+      const rim = new THREE.DirectionalLight(0xffe6aa, 0.5)
+      rim.position.set(-3, 2, -2)
+      scene.add(rim)
+    }
 
     // Optional: debug landmark points/lines (visibility toggled later)
     {
@@ -148,7 +175,11 @@ export default function TryOn({ productId, sourceModel, onClose }){
       const w = videoRef.current?.videoWidth || window.innerWidth
       const h = videoRef.current?.videoHeight || window.innerHeight
       renderer.setSize(w, h)
-      camera.aspect = w / h
+      const a = w / h
+      camera.left = -a
+      camera.right = a
+      camera.top = 1
+      camera.bottom = -1
       camera.updateProjectionMatrix()
     }
     const onResize = () => updateSize()
@@ -158,8 +189,8 @@ export default function TryOn({ productId, sourceModel, onClose }){
     videoRef.current?.addEventListener('loadedmetadata', onMeta)
 
     // Init face mesh
-    const faceMesh = new FaceMeshCls({locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`})
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 })
+  const faceMesh = new FaceMeshCls({locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`})
+  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, selfieMode: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 })
     // Capture tessellation connections if exported by module/globals
     try {
       const mod = await import('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js')
@@ -174,10 +205,12 @@ export default function TryOn({ productId, sourceModel, onClose }){
       const mpCamera = new CameraCls(videoRef.current, {
         onFrame: async ()=>{ await faceMesh.send({image: videoRef.current}) },
         width: initialW,
-        height: initialH
+        height: initialH,
+        facingMode: 'user'
       })
       overlayRef.current.mpCamera = mpCamera
       await mpCamera.start()
+      setStatus('Camera started. Looking for a face…')
     } catch (e) {
       if (import.meta.env && import.meta.env.DEV) console.warn('TryOn: mpCamera start failed', e)
       const insecure = location.protocol !== 'https:' && location.hostname !== 'localhost'
@@ -212,6 +245,29 @@ export default function TryOn({ productId, sourceModel, onClose }){
   return () => { stop() }
   }, [])
 
+  // Status watchdog: update status text based on time since last detection
+  useEffect(() => {
+    let timer
+    if (running) {
+      timer = setInterval(() => {
+        const now = performance.now()
+        const last = lastResultRef.current || 0
+        const delta = last === 0 ? Infinity : now - last
+        // Only change status if not currently tracking
+        if (last === 0) {
+          if (statusRef.current !== 'Camera started. Looking for a face…' && statusRef.current !== 'Loading camera modules…') {
+            setStatus('Camera started. Looking for a face…')
+          }
+        } else if (delta > 5000) {
+          if (statusRef.current !== 'No face detected') setStatus('No face detected')
+        } else if (delta > 1500) {
+          if (statusRef.current !== 'Looking for a face…') setStatus('Looking for a face…')
+        }
+      }, 500)
+    }
+    return () => { if (timer) clearInterval(timer) }
+  }, [running])
+
   // Allow closing with Esc
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose && onClose() }
@@ -224,6 +280,9 @@ export default function TryOn({ productId, sourceModel, onClose }){
     if (!or || !or.model) return
     if (!results.multiFaceLandmarks || !results.multiFaceLandmarks[0]) return
     const lm = results.multiFaceLandmarks[0]
+  // mark last successful detection time and set status
+  lastResultRef.current = performance.now()
+  if (statusRef.current !== 'Tracking face') setStatus('Tracking face')
     const preset = PRESSETS[pid] || PRESSETS['necklace']
 
     // DT for framerate-compensated smoothing
@@ -231,8 +290,10 @@ export default function TryOn({ productId, sourceModel, onClose }){
     const dt = (now - smoothRef.current.t) / 1000
     smoothRef.current.t = now
 
-    // Prepare convenient landmark vectors (normalized to our overlay space)
-  const toVec3 = (p) => new THREE.Vector3((p.x - 0.5) * 2, -(p.y - 0.5) * 2, (p.z || 0) * 2)
+  // Prepare convenient landmark vectors (normalized to our overlay space), aspect-aware for ortho cam
+  const cam = overlayRef.current.camera
+  const ax = (cam && cam.right) ? cam.right : 1
+  const toVec3 = (p) => new THREE.Vector3(((p.x - 0.5) * 2) * ax, -((p.y - 0.5) * 2), (p.z || 0) * 2)
     const lEyeOuter = toVec3(lm[33])
     const rEyeOuter = toVec3(lm[263])
     const midEye = lEyeOuter.clone().add(rEyeOuter).multiplyScalar(0.5)
@@ -316,8 +377,9 @@ export default function TryOn({ productId, sourceModel, onClose }){
 
     // anchor by nose for neck, by ear for earrings
     if (preset.attach === 'neck'){
-      const x = nose.x; const y = nose.y // already converted above
-      const targetPos = new THREE.Vector3((x - 0.5) * 2 + preset.offset.x, -(y - 0.5) * 2 + preset.offset.y, preset.offset.z)
+      // Anchor around neck line: start near nose but bias towards chin
+      const neckAnchor = nose.clone().lerp(chin, 0.6)
+      const targetPos = new THREE.Vector3(neckAnchor.x + preset.offset.x, neckAnchor.y + preset.offset.y, preset.offset.z)
   // Smooth position with exponential lerp
   const alpha = 0.22
   const k = 1 - Math.pow(1 - alpha, Math.max(1, dt*60))
@@ -330,7 +392,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
         const vL = toVec3(left)
         const vR = toVec3(right)
         const dist3 = vL.distanceTo(vR)
-        const rawS = THREE.MathUtils.clamp(dist3 * 3.5 * preset.scale, 0.35, 3)
+        const rawS = THREE.MathUtils.clamp(dist3 * 3.2 * preset.scale, 0.35, 3)
   const kS = 1 - Math.pow(1 - 0.2, Math.max(1, dt*60))
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
@@ -340,9 +402,8 @@ export default function TryOn({ productId, sourceModel, onClose }){
       const left = lm[234]
       const right = lm[454]
       if (left){
-        const x = (left.x - 0.5) * 2
-        const y = -(left.y - 0.5) * 2
-        const targetPos = new THREE.Vector3(x + preset.offset.x, y + preset.offset.y, preset.offset.z)
+        const vL = toVec3(left)
+        const targetPos = new THREE.Vector3(vL.x + preset.offset.x, vL.y + preset.offset.y, preset.offset.z)
   const alpha = 0.22
   const k = 1 - Math.pow(1 - alpha, Math.max(1, dt*60))
   smoothRef.current.pos.lerp(targetPos, k)
@@ -352,7 +413,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
         const vL = toVec3(left)
         const vR = toVec3(right)
         const dist3 = vL.distanceTo(vR)
-        const rawS = THREE.MathUtils.clamp(dist3 * 3.8 * preset.scale, 0.3, 2.5)
+        const rawS = THREE.MathUtils.clamp(dist3 * 3.6 * preset.scale, 0.3, 2.5)
   const kS = 1 - Math.pow(1 - 0.2, Math.max(1, dt*60))
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
@@ -370,8 +431,11 @@ export default function TryOn({ productId, sourceModel, onClose }){
 
   return (
     <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <video ref={videoRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none',zIndex:0}} autoPlay playsInline muted></video>
-      <div ref={canvasRef} style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:1}} />
+      {/* Mirror video+canvas for selfie mode to match landmark coordinates */}
+      <div style={{position:'absolute',inset:0,transform:'scaleX(-1)'}}>
+        <video ref={videoRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none',zIndex:0}} autoPlay playsInline muted></video>
+        <div ref={canvasRef} style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:1}} />
+      </div>
       <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2, display:'flex', gap:8}}>
         <button onClick={() => { onClose(); }} className="btn" aria-label="Close camera">Close Camera</button>
         <button onClick={() => {
@@ -385,6 +449,18 @@ export default function TryOn({ productId, sourceModel, onClose }){
             return next
           })
         }} className="btn" aria-label="Toggle face mesh">{showMesh ? 'Hide Mesh' : 'Show Mesh'}</button>
+      </div>
+      {/* Status chip (top-right) */}
+      <div style={{position:'absolute',top:12,right:12,zIndex:2,pointerEvents:'none'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(17,17,17,0.7)',color:'#fff',padding:'6px 10px',borderRadius:9999,border:'1px solid rgba(255,255,255,0.12)',backdropFilter:'blur(6px)'}}>
+          <span style={{display:'inline-block',width:8,height:8,borderRadius:9999,background:(()=>{
+            if (status.startsWith('Tracking')) return '#16a34a' // green
+            if (status.startsWith('No face')) return '#dc2626' // red
+            if (status.startsWith('Loading')) return '#3b82f6' // blue
+            return '#f59e0b' // amber for looking
+          })()}} />
+          <span style={{fontSize:12,opacity:0.95}}>{status}</span>
+        </div>
       </div>
   {/* Start button removed: camera starts automatically when overlay opens */}
       {errorMsg && (
