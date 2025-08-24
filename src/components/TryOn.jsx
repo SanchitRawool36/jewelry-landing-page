@@ -128,8 +128,9 @@ export default function TryOn({ productId, sourceModel, onClose }){
     camera.position.set(0,0,3)
 
     // Clone provided model
-    const cloned = sourceModel.clone(true)
-    cloned.traverse(n=>{ if(n.isMesh){ n.castShadow = false; n.frustumCulled = false }})
+  const cloned = sourceModel.clone(true)
+  cloned.traverse(n=>{ if(n.isMesh){ n.castShadow = false; n.frustumCulled = false }})
+  cloned.visible = false
     scene.add(cloned)
 
     // Add a simple light rig for shiny PBR materials
@@ -190,7 +191,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
 
     // Init face mesh
   const faceMesh = new FaceMeshCls({locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`})
-  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, selfieMode: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 })
+  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, selfieMode: true, minDetectionConfidence: 0.3, minTrackingConfidence: 0.3 })
     // Capture tessellation connections if exported by module/globals
     try {
       const mod = await import('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js')
@@ -278,11 +279,16 @@ export default function TryOn({ productId, sourceModel, onClose }){
   function onFaceResults(results, pid){
     const or = overlayRef.current
     if (!or || !or.model) return
-    if (!results.multiFaceLandmarks || !results.multiFaceLandmarks[0]) return
+    if (!results.multiFaceLandmarks || !results.multiFaceLandmarks[0]) {
+      // hide model if no face to prevent floating
+      if (or.model) or.model.visible = false
+      return
+    }
     const lm = results.multiFaceLandmarks[0]
   // mark last successful detection time and set status
   lastResultRef.current = performance.now()
   if (statusRef.current !== 'Tracking face') setStatus('Tracking face')
+    if (or.model) or.model.visible = true
     const preset = PRESSETS[pid] || PRESSETS['necklace']
 
     // DT for framerate-compensated smoothing
