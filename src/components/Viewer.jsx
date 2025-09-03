@@ -5,6 +5,8 @@ import { OrbitControls, Environment, Html, ContactShadows } from '@react-three/d
 import Model from './Model'
 import CameraController from './CameraController'
 import TryOn from './TryOn'
+import TryOnMindAR from './TryOnMindAR'
+import { PRESSETS } from './presets'
 
 function Loader(){
   return <Html center>Loading…</Html>
@@ -17,6 +19,7 @@ export default function Viewer({ product, products, onSelect }){
   const [overlayOpen, setOverlayOpen] = useState(false)
   const [overlayModel, setOverlayModel] = useState(null)
   const [overlayProduct, setOverlayProduct] = useState(null)
+  const [overlayFallback, setOverlayFallback] = useState(false)
   const [finish, setFinish] = useState('polished') // polished | satin | matte
   const [shine, setShine] = useState(1.2) // env intensity multiplier
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -134,7 +137,7 @@ export default function Viewer({ product, products, onSelect }){
               <button onClick={() => onSelect(p)} className="btn btn-ghost w-full justify-start">
                 {p.name}{p.priceRs ? ` — ${p.priceRs}rs` : ''}
               </button>
-              <button onClick={() => { setOverlayProduct(p.id); setOverlayOpen(true) }} className="btn ml-2">Try</button>
+              <button onClick={() => { setOverlayProduct(p.id); setOverlayFallback(false); setOverlayOpen(true) }} className="btn ml-2">Try</button>
             </div>
           ))}
         </div>
@@ -268,7 +271,11 @@ export default function Viewer({ product, products, onSelect }){
       )}
 
       {overlayOpen && overlayModel && (
-        <TryOn productId={overlayProduct} sourceModel={overlayModel} onClose={()=>setOverlayOpen(false)} />
+        (overlayProduct && (['ear','nose','neck'].includes(PRESSETS[overlayProduct]?.attach)) && !overlayFallback) ? (
+          <TryOnMindAR productId={overlayProduct} sourceModel={overlayModel} onClose={()=>setOverlayOpen(false)} onFallback={()=>setOverlayFallback(true)} />
+        ) : (
+          <TryOn productId={overlayProduct} sourceModel={overlayModel} onClose={()=>setOverlayOpen(false)} />
+        )
       )}
     </div>
   )

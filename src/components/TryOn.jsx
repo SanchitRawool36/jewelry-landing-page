@@ -18,6 +18,25 @@ export default function TryOn({ productId, sourceModel, onClose }){
   // Smoothing state
   const smoothRef = useRef({ pos: new THREE.Vector3(0,0,0), scale: 1, rot: new THREE.Quaternion(), t: performance.now() })
   const [showMesh, setShowMesh] = useState(false)
+  const [sizeMul, setSizeMul] = useState(0.3)
+  const [showCoords, setShowCoords] = useState(false)
+  const [showLabels, setShowLabels] = useState(false)
+  const [showGrid, setShowGrid] = useState(false)
+  const [faceInfo, setFaceInfo] = useState({
+    nose: { x: '-', y: '-', z: '-' },
+    leftEar: { x: '-', y: '-', z: '-' },
+    rightEar: { x: '-', y: '-', z: '-' },
+    leftEye: { x: '-', y: '-', z: '-' },
+    rightEye: { x: '-', y: '-', z: '-' },
+  })
+  const [labelPos, setLabelPos] = useState({
+    nose: { x: 0.5, y: 0.5 },
+    leftEar: { x: 0.4, y: 0.5 },
+    rightEar: { x: 0.6, y: 0.5 },
+    leftEye: { x: 0.45, y: 0.45 },
+    rightEye: { x: 0.55, y: 0.45 },
+  })
+  const [faceBox, setFaceBox] = useState({ x: 0.35, y: 0.35, w: 0.3, h: 0.3 })
 
   // mirror status into a ref to minimize unnecessary re-renders inside tight loops
   useEffect(() => { statusRef.current = status }, [status])
@@ -285,6 +304,12 @@ export default function TryOn({ productId, sourceModel, onClose }){
       return
     }
     const lm = results.multiFaceLandmarks[0]
+    // Ensure debug helpers match "showMesh" visibility on first creation
+    const orRef = overlayRef.current
+    if (orRef) {
+      if (orRef.debugPoints) orRef.debugPoints.visible = !!showMesh
+      if (orRef.debugLines) orRef.debugLines.visible = !!showMesh
+    }
   // mark last successful detection time and set status
   lastResultRef.current = performance.now()
   if (statusRef.current !== 'Tracking face') setStatus('Tracking face')
@@ -299,7 +324,8 @@ export default function TryOn({ productId, sourceModel, onClose }){
   // Prepare convenient landmark vectors (normalized to our overlay space), aspect-aware for ortho cam
   const cam = overlayRef.current.camera
   const ax = (cam && cam.right) ? cam.right : 1
-  const toVec3 = (p) => new THREE.Vector3(((p.x - 0.5) * 2) * ax, -((p.y - 0.5) * 2), (p.z || 0) * 2)
+  // Use mirrored X so user motion feels natural with selfie view
+  const toVec3 = (p) => new THREE.Vector3(-((p.x - 0.5) * 2) * ax, -((p.y - 0.5) * 2), (p.z || 0) * 2)
     const lEyeOuter = toVec3(lm[33])
     const rEyeOuter = toVec3(lm[263])
     const midEye = lEyeOuter.clone().add(rEyeOuter).multiplyScalar(0.5)
@@ -308,17 +334,52 @@ export default function TryOn({ productId, sourceModel, onClose }){
     const leftEar = lm[234] ? toVec3(lm[234]) : lEyeOuter
     const rightEar = lm[454] ? toVec3(lm[454]) : rEyeOuter
 
-    // Optional: update debug points
+    // Update a lightweight landmark coordinate panel (0..1 normalized from MediaPipe)
+    const to01 = (p) => ({ x: p?.x != null ? p.x.toFixed(2) : '-', y: p?.y != null ? p.y.toFixed(2) : '-', z: p?.z != null ? p.z.toFixed(2) : '-' })
+    try {
+      setFaceInfo({
+        nose: to01(lm[1]),
+        leftEar: to01(lm[234]),
+        rightEar: to01(lm[454]),
+        leftEye: to01(lm[33]),
+        rightEye: to01(lm[263])
+      })
+      // Also update label positions (0..1, raw, not mirrored here since parent is mirrored)
+      setLabelPos({
+        nose: { x: lm[1]?.x ?? 0.5, y: lm[1]?.y ?? 0.5 },
+        leftEar: { x: lm[234]?.x ?? 0.4, y: lm[234]?.y ?? 0.5 },
+        rightEar: { x: lm[454]?.x ?? 0.6, y: lm[454]?.y ?? 0.5 },
+        leftEye: { x: lm[33]?.x ?? 0.45, y: lm[33]?.y ?? 0.45 },
+        rightEye: { x: lm[263]?.x ?? 0.55, y: lm[263]?.y ?? 0.45 },
+      })
+    } catch {}
+
+    // Optional: update debug points and compute face bounding box
     if (or.debugPoints && or.debugPoints.visible) {
       const arr = or.debugPoints.geometry.attributes.position.array
+      let minx = 1, miny = 1, maxx = 0, maxy = 0
       for (let i = 0; i < 468; i++) {
         const p = lm[i]
         const v = toVec3(p)
         arr[i*3+0] = v.x
         arr[i*3+1] = v.y
         arr[i*3+2] = v.z
+        if (p) {
+          if (p.x < minx) minx = p.x
+          if (p.y < miny) miny = p.y
+          if (p.x > maxx) maxx = p.x
+          if (p.y > maxy) maxy = p.y
+        }
       }
       or.debugPoints.geometry.attributes.position.needsUpdate = true
+      if (Number.isFinite(minx) && Number.isFinite(miny) && Number.isFinite(maxx) && Number.isFinite(maxy)) {
+        const pad = 0.03
+        minx = Math.max(0, minx - pad)
+        miny = Math.max(0, miny - pad)
+        maxx = Math.min(1, maxx + pad)
+        maxy = Math.min(1, maxy + pad)
+        setFaceBox({ x: minx, y: miny, w: Math.max(0.02, maxx - minx), h: Math.max(0.02, maxy - miny) })
+      }
     }
     if (or.debugLines && or.debugLines.visible && or.connections) {
       const pos = or.debugLines.geometry.attributes.position
@@ -343,7 +404,8 @@ export default function TryOn({ productId, sourceModel, onClose }){
 
     // Compute head orientation basis from eyes and nose
     // x-axis: from right eye to left eye; y-axis: approx from nose to eyes; z-axis: cross
-    let xAxis = rEyeOuter.clone().sub(lEyeOuter).multiplyScalar(-1) // left-to-right
+  // Orientation basis without extra sign (mirroring handled by toVec3)
+  let xAxis = rEyeOuter.clone().sub(lEyeOuter) // left-to-right
     if (xAxis.lengthSq() < 1e-6) xAxis = new THREE.Vector3(1,0,0)
     xAxis.normalize()
     let yApprox = midEye.clone().sub(nose) // up-ish
@@ -381,7 +443,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
 
     or.model.quaternion.copy(smoothRef.current.rot)
 
-    // anchor by nose for neck, by ear for earrings
+  // anchor by nose for neck, by ear for earrings, by nostril for nose ring
     if (preset.attach === 'neck'){
       // Anchor around neck line: start near nose but bias towards chin
       const neckAnchor = nose.clone().lerp(chin, 0.6)
@@ -403,13 +465,17 @@ export default function TryOn({ productId, sourceModel, onClose }){
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
       }
-    } else if (preset.attach === 'ear'){
+  } else if (preset.attach === 'ear'){
       // place near ear landmarks
       const left = lm[234]
       const right = lm[454]
       if (left){
-        const vL = toVec3(left)
-        const targetPos = new THREE.Vector3(vL.x + preset.offset.x, vL.y + preset.offset.y, preset.offset.z)
+  const vL = toVec3(left)
+  // Nudge slightly toward face center using eye vector to reduce lateral drift
+  const midEye = toVec3(lm[33]).clone().add(toVec3(lm[263])).multiplyScalar(0.5)
+  const centerDir = midEye.clone().sub(vL).setZ(0)
+  const nudge = centerDir.multiplyScalar(0.10) // 10% toward center
+  const targetPos = new THREE.Vector3(vL.x + nudge.x + preset.offset.x, vL.y + nudge.y + preset.offset.y, preset.offset.z)
   const alpha = 0.22
   const k = 1 - Math.pow(1 - alpha, Math.max(1, dt*60))
   smoothRef.current.pos.lerp(targetPos, k)
@@ -419,11 +485,33 @@ export default function TryOn({ productId, sourceModel, onClose }){
         const vL = toVec3(left)
         const vR = toVec3(right)
         const dist3 = vL.distanceTo(vR)
-        const rawS = THREE.MathUtils.clamp(dist3 * 3.6 * preset.scale, 0.3, 2.5)
+  // Smaller baseline for earrings so they look like studs by default
+  let rawS = THREE.MathUtils.clamp(dist3 * 1.0 * preset.scale, 0.06, 0.6)
+        rawS *= (sizeMul || 1)
   const kS = 1 - Math.pow(1 - 0.2, Math.max(1, dt*60))
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
       }
+    } else if (preset.attach === 'nose'){
+      // Place near left nostril area relative to head x-axis from eyes
+  let xAxis = rEyeOuter.clone().sub(lEyeOuter)
+      if (xAxis.lengthSq() < 1e-6) xAxis = new THREE.Vector3(1,0,0)
+      xAxis.normalize()
+      const base = nose.clone().add(xAxis.clone().multiplyScalar(0.08))
+      const targetPos = new THREE.Vector3(base.x + preset.offset.x, base.y + preset.offset.y, preset.offset.z)
+      const alpha = 0.22
+      const k = 1 - Math.pow(1 - alpha, Math.max(1, dt*60))
+      smoothRef.current.pos.lerp(targetPos, k)
+      or.model.position.copy(smoothRef.current.pos)
+      const vL = toVec3(lm[234] || lm[33])
+      const vR = toVec3(lm[454] || lm[263])
+      const dist3 = vL.distanceTo(vR)
+  // Smaller baseline for nose rings
+  let rawS = THREE.MathUtils.clamp(dist3 * (preset.scale || 1) * 0.9, 0.05, 0.35)
+  rawS *= (sizeMul || 1)
+      const kS = 1 - Math.pow(1 - 0.2, Math.max(1, dt*60))
+      smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
+      or.model.scale.setScalar(smoothRef.current.scale)
     }
   }
 
@@ -444,18 +532,61 @@ export default function TryOn({ productId, sourceModel, onClose }){
       </div>
       <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2, display:'flex', gap:8}}>
         <button onClick={() => { onClose(); }} className="btn" aria-label="Close camera">Close Camera</button>
-        <button onClick={() => {
-          setShowMesh((v)=>{
-            const next = !v
-            const or = overlayRef.current
-            if (or) {
-              if (or.debugPoints) or.debugPoints.visible = next
-              if (or.debugLines) or.debugLines.visible = next
-            }
-            return next
-          })
-        }} className="btn" aria-label="Toggle face mesh">{showMesh ? 'Hide Mesh' : 'Show Mesh'}</button>
       </div>
+      <div style={{position:'absolute',top:'60px',left:'12px',pointerEvents:'auto',zIndex:2}} className="card p-2">
+        <div className="text-xs font-medium mb-1">Size</div>
+        <input type="range" min={0.3} max={1.2} step={0.01} value={sizeMul} onChange={(e)=>setSizeMul(parseFloat(e.target.value))} style={{width:180}} />
+      </div>
+      {showLabels && (
+        <div style={{position:'absolute',inset:0,transform:'scaleX(-1)',pointerEvents:'none',zIndex:2}}>
+          {[
+            { key:'nose', label:'Nose', pos:labelPos.nose },
+            { key:'leftEye', label:'LEye', pos:labelPos.leftEye },
+            { key:'rightEye', label:'REye', pos:labelPos.rightEye },
+            { key:'leftEar', label:'LEar', pos:labelPos.leftEar },
+            { key:'rightEar', label:'REar', pos:labelPos.rightEar },
+          ].map(it => (
+            <span key={it.key}
+              style={{
+                position:'absolute',
+                left: `${(it.pos?.x ?? 0.5) * 100}%`,
+                top: `${(it.pos?.y ?? 0.5) * 100}%`,
+                transform:'translate(-50%, -120%)',
+                background:'rgba(0,0,0,0.6)',
+                color:'#fff',
+                fontSize:12,
+                padding:'2px 6px',
+                borderRadius:6,
+                whiteSpace:'nowrap'
+              }}
+            >{it.label}</span>
+          ))}
+        </div>
+      )}
+      {showGrid && (
+        <div style={{position:'absolute',inset:0,transform:'scaleX(-1)',pointerEvents:'none',zIndex:2}}>
+          <div
+            style={{
+              position:'absolute',
+              left: `${faceBox.x * 100}%`,
+              top: `${faceBox.y * 100}%`,
+              width: `${faceBox.w * 100}%`,
+              height: `${faceBox.h * 100}%`,
+              border: '1px solid rgba(255,255,255,0.7)',
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.0)',
+              borderRadius: 6
+            }}
+          >
+            {/* 3x3 grid lines */}
+            <div style={{position:'absolute',left:'33.333%',top:0,bottom:0,width:1,background:'rgba(255,255,255,0.6)'}}></div>
+            <div style={{position:'absolute',left:'66.666%',top:0,bottom:0,width:1,background:'rgba(255,255,255,0.6)'}}></div>
+            <div style={{position:'absolute',top:'33.333%',left:0,right:0,height:1,background:'rgba(255,255,255,0.6)'}}></div>
+            <div style={{position:'absolute',top:'66.666%',left:0,right:0,height:1,background:'rgba(255,255,255,0.6)'}}></div>
+            {/* Center crosshair */}
+            <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:12,height:12,border:'1px solid rgba(255,255,255,0.75)',borderRadius:2}}></div>
+          </div>
+        </div>
+      )}
       {/* Status chip (top-right) */}
       <div style={{position:'absolute',top:12,right:12,zIndex:2,pointerEvents:'none'}}>
         <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(17,17,17,0.7)',color:'#fff',padding:'6px 10px',borderRadius:9999,border:'1px solid rgba(255,255,255,0.12)',backdropFilter:'blur(6px)'}}>
@@ -468,6 +599,16 @@ export default function TryOn({ productId, sourceModel, onClose }){
           <span style={{fontSize:12,opacity:0.95}}>{status}</span>
         </div>
       </div>
+      {showCoords && (
+        <div style={{position:'absolute',top:52,right:12,zIndex:2,pointerEvents:'auto'}} className="card p-2">
+          <div className="text-xs font-medium mb-1">Face points (0–1)</div>
+          <div className="text-xs text-slate-700">Nose: {faceInfo.nose.x}, {faceInfo.nose.y}</div>
+          <div className="text-xs text-slate-700">LEar: {faceInfo.leftEar.x}, {faceInfo.leftEar.y}</div>
+          <div className="text-xs text-slate-700">REar: {faceInfo.rightEar.x}, {faceInfo.rightEar.y}</div>
+          <div className="text-xs text-slate-700">LEye: {faceInfo.leftEye.x}, {faceInfo.leftEye.y}</div>
+          <div className="text-xs text-slate-700">REye: {faceInfo.rightEye.x}, {faceInfo.rightEye.y}</div>
+        </div>
+      )}
   {/* Start button removed: camera starts automatically when overlay opens */}
       {errorMsg && (
         <div style={{position:'absolute',bottom:12,left:'50%',transform:'translateX(-50%)',pointerEvents:'auto'}} className="card p-3 max-w-md">
