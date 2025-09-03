@@ -83,7 +83,7 @@ export default function App(){
   ]
 
   return (
-    <div className="min-h-screen w-full relative" style={{background:'#f7f3ea'}}>
+  <div className="min-h-screen w-full relative" style={{background:'#f7f3ea', ['--paper-overlay-opacity']: 0.42}}>
       {/* Global subtle paper texture */}
       <div className="paper-overlay" />
       {/* App Content */}
@@ -95,16 +95,6 @@ export default function App(){
         <main className="flex-1 flex items-stretch">
           {/* Keep black only for the model viewer to enhance contrast */}
           <div className="min-h-screen relative w-full bg-black">
-            {/* Soft Dark Yellow Glow only behind the 3D viewer */}
-            <div
-              className="absolute inset-0 z-0"
-              style={{
-                backgroundImage: 'radial-gradient(circle at center, #ccb755 0%, transparent 70%)',
-                opacity: 0.6,
-                mixBlendMode: 'screen',
-                pointerEvents: 'none',
-              }}
-            />
             <div className="relative z-10">
               <Suspense fallback={<div className="p-6">Loading viewer...</div>}>
                 <Viewer product={product} products={products} onSelect={setProduct} />

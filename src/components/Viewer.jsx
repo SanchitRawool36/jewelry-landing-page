@@ -167,18 +167,8 @@ export default function Viewer({ product, products, onSelect }){
                   </button>
                 ))}
               </div>
-              <div className="mt-3 relative rounded-md overflow-hidden">
-                {/* Soft Dark Yellow Glow behind Shine */}
-                <div
-                  className="absolute inset-0 z-0"
-                  style={{
-                    backgroundImage: 'radial-gradient(circle at center, #ccb755 0%, transparent 70%)',
-                    opacity: 0.6,
-                    mixBlendMode: 'multiply',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <div className="relative z-10">
+              <div className="mt-3">
+                <div>
                   <label className="text-sm font-medium">Shine</label>
                   <input
                     type="range"
@@ -252,18 +242,8 @@ export default function Viewer({ product, products, onSelect }){
                               </button>
                             ))}
                           </div>
-                          <div className="mt-3 relative rounded-md overflow-hidden">
-                            {/* Soft Dark Yellow Glow behind Shine (mobile) */}
-                            <div
-                              className="absolute inset-0 z-0"
-                              style={{
-                                backgroundImage: 'radial-gradient(circle at center, #ccb755 0%, transparent 70%)',
-                                opacity: 0.6,
-                                mixBlendMode: 'multiply',
-                                pointerEvents: 'none',
-                              }}
-                            />
-                            <div className="relative z-10">
+                          <div className="mt-3">
+                            <div>
                               <label className="text-sm font-medium">Shine</label>
                               <input
                                 type="range"
