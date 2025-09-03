@@ -20,6 +20,14 @@
   --nav-text-shadow: none;
 }
 
+/* In light mode, disable the blur/whitened filter effect to avoid washing out siblings */
+.gooey-nav-container.light .effect.filter {
+  display: none;
+}
+.gooey-nav-container.light .effect.text {
+  display: none;
+}
+
 .gooey-nav-container {
   position: relative;
 }
