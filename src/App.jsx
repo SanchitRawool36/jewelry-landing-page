@@ -83,7 +83,9 @@ export default function App(){
   ]
 
   return (
-  <div className="min-h-screen w-full relative bg-white">
+    <div className="min-h-screen w-full relative" style={{background:'#f7f3ea'}}>
+      {/* Global subtle paper texture */}
+      <div className="paper-overlay" />
       {/* App Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
     <AnnouncementBar />
@@ -91,6 +93,7 @@ export default function App(){
     <Hero onShopNow={() => document.querySelector('#products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
       onTryNow={() => document.querySelector('.viewer-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <main className="flex-1 flex items-stretch">
+          {/* Keep black only for the model viewer to enhance contrast */}
           <div className="min-h-screen relative w-full bg-black">
             {/* Soft Dark Yellow Glow only behind the 3D viewer */}
             <div
@@ -112,7 +115,7 @@ export default function App(){
   <Categories onSelect={(key)=> document.querySelector('#products')?.scrollIntoView({ behavior: 'smooth' })} />
   <TrustBar />
         {/* Sections for navbar anchors */}
-        <section id="products" className="relative px-4 md:px-8 py-16 bg-black overflow-hidden">
+  <section id="products" className="relative px-4 md:px-8 py-16 overflow-hidden" style={{background:'#f7f3ea'}}>
           {/* Prismatic Aurora Burst - Multi-layered Gradient */}
           <div
             className="absolute inset-0 z-0"
@@ -128,8 +131,8 @@ export default function App(){
             }}
           />
           <div className="relative z-10">
-            <h2 className="text-2xl font-semibold mb-4 text-white">Products</h2>
-            <p className="text-slate-300 mb-4">Explore our curated collection. Select a product above to view it in 3D and try it on.</p>
+            <h2 className="text-2xl font-semibold mb-4 text-[#3a2a1a]">Products</h2>
+            <p className="text-slate-700 mb-4">Explore our curated collection. Select a product above to view it in 3D and try it on.</p>
             <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {products.map(p => (
                 <li key={p.id} className="card p-4 flex flex-col gap-2">
@@ -144,7 +147,7 @@ export default function App(){
           </div>
         </section>
 
-        <section id="about" className="relative px-4 md:px-8 py-16 bg-black overflow-hidden">
+  <section id="about" className="relative px-4 md:px-8 py-16 overflow-hidden" style={{background:'#f7f3ea'}}>
           {/* Prismatic Aurora Burst - Multi-layered Gradient */}
           <div
             className="absolute inset-0 z-0"
@@ -160,8 +163,8 @@ export default function App(){
             }}
           />
           <div className="relative z-10">
-            <h2 className="text-2xl font-semibold mb-4 text-white">About</h2>
-            <p className="max-w-3xl text-slate-300">We craft immersive 3D jewelry experiences. Try on pieces in real time using your camera, explore materials and finishes, and discover how each item feels before you buy.</p>
+            <h2 className="text-2xl font-semibold mb-4 text-[#3a2a1a]">About</h2>
+            <p className="max-w-3xl text-slate-700">We craft immersive 3D jewelry experiences. Try on pieces in real time using your camera, explore materials and finishes, and discover how each item feels before you buy.</p>
             <div className="mt-6" style={{ height: '220px', position: 'relative' }}>
               <GooeyNav
                 items={[
@@ -181,7 +184,7 @@ export default function App(){
           </div>
         </section>
 
-        <section id="contact" className="relative px-4 md:px-8 py-16 bg-black overflow-hidden">
+  <section id="contact" className="relative px-4 md:px-8 py-16 overflow-hidden" style={{background:'#f7f3ea'}}>
           {/* Prismatic Aurora Burst - Multi-layered Gradient */}
           <div
             className="absolute inset-0 z-0"
@@ -197,7 +200,7 @@ export default function App(){
             }}
           />
           <div className="relative z-10">
-            <h2 className="text-2xl font-semibold mb-4 text-white">Contact</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-[#3a2a1a]">Contact</h2>
             <div className="grid gap-4 max-w-xl">
               <a className="btn" href="mailto:hello@example.com">Email: hello@example.com</a>
               <a className="btn" href="tel:+10000000000">Phone: +1 000 000 0000</a>

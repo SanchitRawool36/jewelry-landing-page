@@ -1,14 +1,15 @@
 :root {
   --linear-ease: linear(0, 0.068, 0.19 2.7%, 0.804 8.1%, 1.037, 1.199 13.2%, 1.245, 1.27 15.8%, 1.274, 1.272 17.4%, 1.249 19.1%, 0.996 28%, 0.949, 0.928 33.3%, 0.926, 0.933 36.8%, 1.001 45.6%, 1.013, 1.019 50.8%, 1.018 54.4%, 1 63.1%, 0.995 68%, 1.001 85%, 1);
-  --color-1: #ffd166;
-  --color-2: #ef476f;
-  --color-3: #06d6a0;
-  --color-4: #118ab2;
+  /* Royal accent palette */
+  --color-1: #cbb26a;
+  --color-2: #b97a8f;
+  --color-3: #7fb6a4;
+  --color-4: #6c8fb8;
   /* Theme variables */
-  --nav-text: #ffffff;
-  --nav-active-bg: #ffffff;
-  --nav-active-text: #000000;
-  --nav-text-shadow: 0 1px 1px hsl(205deg 30% 10% / 0.2);
+  --nav-text: #3a2a1a;
+  --nav-active-bg: #f0e8d4;
+  --nav-active-text: #3a2a1a;
+  --nav-text-shadow: none;
 }
 
 /* Light mode on white backgrounds */
@@ -113,7 +114,7 @@
   position: absolute;
   inset: -75px;
   z-index: -2;
-  background: black;
+  background: white;
 }
 
 .gooey-nav-container .effect.filter::after {
