@@ -106,20 +106,6 @@ export default function App(){
   <TrustBar />
         {/* Sections for navbar anchors */}
   <section id="products" className="relative px-4 md:px-8 py-16 overflow-hidden" style={{background:'#f7f3ea'}}>
-          {/* Prismatic Aurora Burst - Multi-layered Gradient */}
-          <div
-            className="absolute inset-0 z-0"
-            style={{
-              background: `
-                radial-gradient(ellipse 120% 80% at 70% 20%, rgba(255, 20, 147, 0.15), transparent 50%),
-                radial-gradient(ellipse 100% 60% at 30% 10%, rgba(0, 255, 255, 0.12), transparent 60%),
-                radial-gradient(ellipse 90% 70% at 50% 0%, rgba(138, 43, 226, 0.18), transparent 65%),
-                radial-gradient(ellipse 110% 50% at 80% 30%, rgba(255, 215, 0, 0.08), transparent 40%),
-                #000000
-              `,
-              pointerEvents: 'none',
-            }}
-          />
           <div className="relative z-10">
             <h2 className="text-2xl font-semibold mb-4 text-[#3a2a1a]">Products</h2>
             <p className="text-slate-700 mb-4">Explore our curated collection. Select a product above to view it in 3D and try it on.</p>
@@ -138,20 +124,6 @@ export default function App(){
         </section>
 
   <section id="about" className="relative px-4 md:px-8 py-16 overflow-hidden" style={{background:'#f7f3ea'}}>
-          {/* Prismatic Aurora Burst - Multi-layered Gradient */}
-          <div
-            className="absolute inset-0 z-0"
-            style={{
-              background: `
-                radial-gradient(ellipse 120% 80% at 70% 20%, rgba(255, 20, 147, 0.15), transparent 50%),
-                radial-gradient(ellipse 100% 60% at 30% 10%, rgba(0, 255, 255, 0.12), transparent 60%),
-                radial-gradient(ellipse 90% 70% at 50% 0%, rgba(138, 43, 226, 0.18), transparent 65%),
-                radial-gradient(ellipse 110% 50% at 80% 30%, rgba(255, 215, 0, 0.08), transparent 40%),
-                #000000
-              `,
-              pointerEvents: 'none',
-            }}
-          />
           <div className="relative z-10">
             <h2 className="text-2xl font-semibold mb-4 text-[#3a2a1a]">About</h2>
             <p className="max-w-3xl text-slate-700">We craft immersive 3D jewelry experiences. Try on pieces in real time using your camera, explore materials and finishes, and discover how each item feels before you buy.</p>
@@ -175,20 +147,6 @@ export default function App(){
         </section>
 
   <section id="contact" className="relative px-4 md:px-8 py-16 overflow-hidden" style={{background:'#f7f3ea'}}>
-          {/* Prismatic Aurora Burst - Multi-layered Gradient */}
-          <div
-            className="absolute inset-0 z-0"
-            style={{
-              background: `
-                radial-gradient(ellipse 120% 80% at 70% 20%, rgba(255, 20, 147, 0.15), transparent 50%),
-                radial-gradient(ellipse 100% 60% at 30% 10%, rgba(0, 255, 255, 0.12), transparent 60%),
-                radial-gradient(ellipse 90% 70% at 50% 0%, rgba(138, 43, 226, 0.18), transparent 65%),
-                radial-gradient(ellipse 110% 50% at 80% 30%, rgba(255, 215, 0, 0.08), transparent 40%),
-                #000000
-              `,
-              pointerEvents: 'none',
-            }}
-          />
           <div className="relative z-10">
             <h2 className="text-2xl font-semibold mb-4 text-[#3a2a1a]">Contact</h2>
             <div className="grid gap-4 max-w-xl">

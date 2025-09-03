@@ -26,7 +26,7 @@ export default function GoldRateWidget(){
   const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: (data?.currency || 'INR'), maximumFractionDigits: 0 }).format(v)
 
   return (
-    <section className="px-4 md:px-8 py-12 bg-[#0d0d0d] text-white">
+    <section className="px-4 md:px-8 py-12" style={{background:'#f7f3ea', color:'#3a2a1a'}}>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-semibold">Gold rate today</h2>
         <div className="flex items-center gap-2">
@@ -39,21 +39,21 @@ export default function GoldRateWidget(){
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card p-4 bg-black/40 border border-white/10">
-          <div className="text-sm text-slate-400">24K ({unit})</div>
-          <div className="text-xl font-semibold mt-1 text-[#ccb755]">{loading ? '—' : (data ? fmt(toUnit(data.perGram['24k'])) : '—')}</div>
+        <div className="card p-4 border border-[#e6dcc3]">
+          <div className="text-sm text-slate-700">24K ({unit})</div>
+          <div className="text-xl font-semibold mt-1" style={{color:'#3a2a1a'}}>{loading ? '—' : (data ? fmt(toUnit(data.perGram['24k'])) : '—')}</div>
         </div>
-        <div className="card p-4 bg-black/40 border border-white/10">
-          <div className="text-sm text-slate-400">22K ({unit})</div>
-          <div className="text-xl font-semibold mt-1 text-[#ccb755]">{loading ? '—' : (data ? fmt(toUnit(data.perGram['22k'])) : '—')}</div>
+        <div className="card p-4 border border-[#e6dcc3]">
+          <div className="text-sm text-slate-700">22K ({unit})</div>
+          <div className="text-xl font-semibold mt-1" style={{color:'#3a2a1a'}}>{loading ? '—' : (data ? fmt(toUnit(data.perGram['22k'])) : '—')}</div>
         </div>
-        <div className="card p-4 bg-black/40 border border-white/10">
-          <div className="text-sm text-slate-400">Last updated</div>
-          <div className="text-base mt-1">{loading ? '—' : (data ? new Date(data.lastUpdated).toLocaleString() : '—')}</div>
-          {error && <div className="text-xs text-red-400 mt-2">{error}</div>}
+        <div className="card p-4 border border-[#e6dcc3]">
+          <div className="text-sm text-slate-700">Last updated</div>
+          <div className="text-base mt-1 text-slate-800">{loading ? '—' : (data ? new Date(data.lastUpdated).toLocaleString() : '—')}</div>
+          {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
         </div>
       </div>
-      <div className="text-xs text-slate-500 mt-3">Note: Rates are indicative. Contact store for final pricing.</div>
+      <div className="text-xs text-slate-700 mt-3">Note: Rates are indicative. Contact store for final pricing.</div>
     </section>
   )
 }

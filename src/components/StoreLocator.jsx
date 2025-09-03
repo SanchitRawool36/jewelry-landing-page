@@ -17,7 +17,7 @@ export default function StoreLocator(){
   const mapsUrl = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
 
   return (
-    <section className="px-4 md:px-8 py-16 bg-black text-white" id="stores">
+    <section className="px-4 md:px-8 py-16" style={{background:'#f7f3ea', color:'#3a2a1a'}} id="stores">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-semibold">Find a store</h2>
         <div className="flex gap-2">
@@ -27,9 +27,9 @@ export default function StoreLocator(){
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {filtered.map((st, i) => (
-          <div key={i} className="card p-4 bg-black/40 border border-white/10">
+          <div key={i} className="card p-4 border border-[#e6dcc3]">
             <div className="text-lg font-semibold">{st.name}</div>
-            <div className="text-slate-300 text-sm">{st.address}, {st.city}</div>
+            <div className="text-slate-700 text-sm">{st.address}, {st.city}</div>
             <div className="mt-3 flex gap-2">
               <a className="btn btn-primary" href={mapsUrl(st.lat, st.lng)} target="_blank" rel="noreferrer">Directions</a>
               <a className="btn" href="#contact">Contact</a>
