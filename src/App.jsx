@@ -2,6 +2,15 @@ import React, { Suspense, useState } from 'react'
 import Navbar from './components/Navbar'
 import GooeyNav from './components/GooeyNav'
 import Viewer from './components/Viewer'
+import AnnouncementBar from './components/AnnouncementBar'
+import Hero from './components/Hero'
+import Categories from './components/Categories'
+import TrustBar from './components/TrustBar'
+import AppointmentCTA from './components/AppointmentCTA'
+import Testimonials from './components/Testimonials'
+import Footer from './components/Footer'
+import StoreLocator from './components/StoreLocator'
+import GoldRateWidget from './components/GoldRateWidget'
 
 export default function App(){
   const [product, setProduct] = useState(null)
@@ -74,10 +83,13 @@ export default function App(){
   ]
 
   return (
-    <div className="min-h-screen w-full relative bg-white">
+  <div className="min-h-screen w-full relative bg-white">
       {/* App Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
-        <Navbar />
+    <AnnouncementBar />
+    <Navbar />
+    <Hero onShopNow={() => document.querySelector('#products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      onTryNow={() => document.querySelector('.viewer-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
         <main className="flex-1 flex items-stretch">
           <div className="min-h-screen relative w-full bg-black">
             {/* Soft Dark Yellow Glow only behind the 3D viewer */}
@@ -97,6 +109,8 @@ export default function App(){
             </div>
           </div>
         </main>
+  <Categories onSelect={(key)=> document.querySelector('#products')?.scrollIntoView({ behavior: 'smooth' })} />
+  <TrustBar />
         {/* Sections for navbar anchors */}
         <section id="products" className="relative px-4 md:px-8 py-16 bg-black overflow-hidden">
           {/* Prismatic Aurora Burst - Multi-layered Gradient */}
@@ -190,6 +204,11 @@ export default function App(){
             </div>
           </div>
         </section>
+  <GoldRateWidget />
+  <StoreLocator />
+  <AppointmentCTA />
+  <Testimonials />
+  <Footer />
       </div>
     </div>
   )
