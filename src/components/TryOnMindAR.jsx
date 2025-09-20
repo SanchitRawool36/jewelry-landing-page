@@ -7,7 +7,9 @@ export default function TryOnMindAR({ productId, sourceModel, onClose, onFallbac
   const containerRef = useRef(null)
   const [errorMsg, setErrorMsg] = useState(null)
   const [running, setRunning] = useState(false)
+  const [sizeMul, setSizeMul] = useState(1.0)
   const mindarRef = useRef(null)
+  const modelRef = useRef(null)
 
   // Helper to inject a script
   const loadScript = (src) => new Promise((resolve, reject) => {
@@ -53,16 +55,18 @@ export default function TryOnMindAR({ productId, sourceModel, onClose, onFallbac
     scene.add(key)
 
     // Clone provided model
-  const model = sourceModel.clone(true)
+    const model = sourceModel.clone(true)
     model.traverse(n=>{ if(n.isMesh){ n.castShadow = false; n.frustumCulled = false } })
-  // Apply preset-driven scale and offset
-  const preset = PRESSETS[productId] || { attach: 'ear', offset: {x:0,y:0,z:0}, scale: 1 }
-  const attach = preset.attach || 'ear'
+    modelRef.current = model
+    
+    // Apply preset-driven scale and offset
+    const preset = PRESSETS[productId] || { attach: 'ear', offset: {x:0,y:0,z:0}, scale: 1 }
+    const attach = preset.attach || 'ear'
     const baseMul = attach === 'nose' ? 0.18 : attach === 'neck' ? 0.6 : 0.25
-  model.scale.setScalar((preset.scale || 1) * baseMul)
-  const holder = new THREE.Group()
-  holder.add(model)
-  model.position.set(preset.offset?.x || 0, preset.offset?.y || 0, preset.offset?.z || 0)
+    model.scale.setScalar((preset.scale || 1) * baseMul * sizeMul)
+    const holder = new THREE.Group()
+    holder.add(model)
+    model.position.set(preset.offset?.x || 0, preset.offset?.y || 0, preset.offset?.z || 0)
     if (preset.rotationOffset) {
       holder.rotation.set(
         THREE.MathUtils.degToRad(preset.rotationOffset.x || 0),
@@ -81,6 +85,12 @@ export default function TryOnMindAR({ productId, sourceModel, onClose, onFallbac
     setRunning(true)
 
     renderer.setAnimationLoop(() => {
+      if (modelRef.current) {
+        const preset = PRESSETS[productId] || { attach: 'ear', scale: 1 }
+        const attach = preset.attach || 'ear'
+        const baseMul = attach === 'nose' ? 0.18 : attach === 'neck' ? 0.6 : 0.25
+        modelRef.current.scale.setScalar((preset.scale || 1) * baseMul * sizeMul)
+      }
       renderer.render(scene, camera)
     })
   }
@@ -102,8 +112,12 @@ export default function TryOnMindAR({ productId, sourceModel, onClose, onFallbac
   return (
     <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
       <div ref={containerRef} style={{position:'absolute',inset:0}} />
-      <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2, display:'flex', gap:8}}>
+      <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2, display:'flex', flexDirection: 'column', gap:8}}>
         <button onClick={() => { stop(); onClose && onClose(); }} className="btn" aria-label="Close camera">Close Camera</button>
+        <div className="card p-2">
+          <div className="text-xs font-medium mb-1">Size</div>
+          <input type="range" min={0.5} max={1.5} step={0.01} value={sizeMul} onChange={(e)=>setSizeMul(parseFloat(e.target.value))} style={{width:180}} />
+        </div>
       </div>
       {errorMsg && (
         <div className="card" style={{position:'absolute',top:12,right:12}}>{errorMsg}</div>

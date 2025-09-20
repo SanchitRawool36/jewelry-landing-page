@@ -10,7 +10,13 @@ body{
 	padding-bottom: env(safe-area-inset-bottom, 0px);
 	padding-left: env(safe-area-inset-left, 0px);
 	-webkit-tap-highlight-color: transparent;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
+
+/* LQIP (Low Quality Image Placeholder) utilities */
+.lqip{ filter: blur(18px) saturate(120%); transform: scale(1.02); transition: filter .6s ease, transform .6s ease; }
+.lqip-loaded{ filter: blur(0) saturate(105%); transform: scale(1); }
 html{ scroll-behavior: smooth; }
 /* Ensure anchored sections aren’t hidden under the header */
 :target{ scroll-margin-top: 80px; }
@@ -26,17 +32,18 @@ html{ scroll-behavior: smooth; }
 
 /* 2D, flat UI primitives using Tailwind's @apply */
 @layer components{
-	.card{ @apply bg-white/90 backdrop-blur rounded-md border border-slate-200; }
+	.card{ @apply bg-white bg-opacity-80 backdrop-blur-sm rounded-xl shadow-lg p-4 border border-white border-opacity-20; }
 	.btn{ @apply inline-flex items-center justify-center px-4 py-2 rounded border border-slate-300 text-sm font-medium text-slate-800 bg-white min-h-[44px]; }
 	.btn:active { transform: translateY(1px); }
 	/* Royal gold primary */
-	.btn-primary{ background-color:#cbb26a; color:#1f1712; border-color:#b79c55; }
+	.btn-primary{ @apply bg-gold hover:bg-gold-dark text-white font-bold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105; }
 	.btn-ghost{ @apply bg-transparent border-transparent text-slate-800; }
 	.chip{ @apply inline-flex items-center px-2.5 py-1 rounded-full border border-slate-300 text-xs md:text-sm bg-white; }
 	.segmented{ @apply inline-flex items-center gap-1 p-1 rounded border border-slate-300 bg-white; }
 	.segmented .seg-btn{ @apply px-3 py-2 rounded text-sm min-h-[44px]; }
 	/* Active pill in warm gold */
 	.segmented .seg-btn[aria-pressed="true"]{ background-color:#cbb26a; color:#1f1712; }
+	.segmented-control button.active { @apply bg-gold text-white; }
 	.sheet{ @apply fixed inset-x-0 bottom-0 p-3 pt-2; padding-bottom: calc(env(safe-area-inset-bottom,0px) + 12px); }
 	.sheet .card{ max-height: min(80vh, 80dvh); overflow: auto; }
 }
@@ -54,7 +61,7 @@ html{ scroll-behavior: smooth; }
 .paper-overlay{
 	position: fixed;
 	inset: 0;
-	z-index: 0;
+	z-index: 1000;
 	pointer-events: none;
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0 0 0.015'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 	background-repeat: repeat;

@@ -2,23 +2,34 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        <title>Aura Jewelers — Premium 3D Jewelry Try‑On</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aura Jewellers - Virtual Try-On</title>
         <meta name="description" content="Explore premium earrings, necklaces, and rings in 3D. Try them on instantly with your camera, view finishes and shine, and shop with confidence." />
 
         <!-- Open Graph / Social -->
         <meta property="og:type" content="website" />
         <meta property="og:url" content="/" />
-        <meta property="og:title" content="Aura Jewelers — Premium 3D Jewelry Try‑On" />
+    <meta property="og:title" content="Aura Jewellers — Premium 3D Jewelry Try‑On" />
+    <meta property="og:site_name" content="Aura Jewellers" />
         <meta property="og:description" content="Explore earrings, necklaces, and rings in 3D. Try them on with your camera and see polished, satin, or matte finishes live." />
         <meta property="og:image" content="/assets/og-preview.jpg" />
         <meta property="og:image:alt" content="3D jewelry preview on model" />
 
         <!-- Twitter Cards -->
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Aura Jewelers — Premium 3D Jewelry Try‑On" />
+    <meta name="twitter:title" content="Aura Jewellers — Premium 3D Jewelry Try‑On" />
         <meta name="twitter:description" content="Explore earrings, necklaces, and rings in 3D. Try them on with your camera and compare finishes live." />
         <meta name="twitter:image" content="/assets/og-preview.jpg" />
+
+    <!-- Preload hero craftsmanship video (optimize Largest Contentful Paint) -->
+    <!-- If moving video to /public/media place the file there and ensure path correctness -->
+    <link rel="preload" as="video" href="/media/d02493b38a39fa1e6ba4186193956699_720w.mp4" type="video/mp4" />
+
+
+        <!-- Google Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
     </head>
     <body class="bg-gray-50">
         <div id="root"></div>

@@ -1,34 +1,29 @@
-import React from 'react'
+import React from 'react';
 
-const tiles = [
-  { key: 'necklace', title: 'Necklaces', subtitle: 'Statement pieces' },
-  { key: 'earrings', title: 'Earrings', subtitle: 'Everyday to bridal' },
-  { key: 'pendants', title: 'Pendants', subtitle: 'Subtle elegance' }
-]
+const categories = [
+  { name: 'Rings', image: '/Images/3fd34c6e-c170-4b0e-96ad-d06970451780.jpeg' },
+  { name: 'Necklaces', image: '/Images/Gold Finish Jewellery Sets From \'Sparkle By….jpeg' },
+  { name: 'Earrings', image: '/Images/Shoot for Dhruvi Jewellery on Behance.jpeg' },
+];
 
-export default function Categories({ onSelect }){
+const Categories = () => {
   return (
-  <section className="relative px-4 md:px-8 py-16" style={{background:'#f7f3ea'}}>
-      <div className="flex items-end justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-white">Explore Collections</h2>
-        <a className="text-[#ccb755] hover:underline" href="#products">View all</a>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {tiles.map(t => (
-          <button
-            key={t.key}
-            className="relative rounded-xl overflow-hidden group h-40 md:h-56 text-left bg-white border border-[#e6dcc3]"
-            onClick={() => onSelect?.(t.key)}
-            style={{}}
-          >
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{background:'radial-gradient(circle at 70% 30%, rgba(203,178,106,0.18) 0%, transparent 60%)'}} />
-            <div className="relative z-10 p-4">
-              <div className="text-[#3a2a1a] text-lg font-medium">{t.title}</div>
-              <div className="text-slate-700 text-sm">{t.subtitle}</div>
+    <section className="py-20 px-4 bg-paper">
+      <div className="container mx-auto">
+        <h2 className="text-4xl font-serif text-center mb-12">Shop by Category</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {categories.map((category) => (
+            <div key={category.name} className="relative group overflow-hidden rounded-lg">
+              <img src={category.image} alt={category.name} className="w-full h-80 object-cover transform group-hover:scale-110 transition-transform duration-500" />
+              <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                <h3 className="text-white text-3xl font-serif">{category.name}</h3>
+              </div>
             </div>
-          </button>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
-  )
-}
+  );
+};
+
+export default Categories;

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-  "build": "vite build && copyfiles -u 0 \"3D models/**/*\" dist",
+    "build": "vite build && copyfiles -u 0 \"3D models/**/*\" dist",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,13 +14,17 @@
     "@use-gesture/react": "^10.2.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "three": "^0.179.1"
+    "rhino3dm": "^7.15.0",
+    "three": "^0.179.1",
+    "three-stdlib": "^2.36.0",
+    "vite-plugin-static-copy": "^3.1.2"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.3",
     "autoprefixer": "^10.4.0",
+    "copyfiles": "^2.4.1",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
-  "vite": "^5.1.0",
-  "copyfiles": "^2.4.1"
+    "vite": "^5.1.0"
   }
 }

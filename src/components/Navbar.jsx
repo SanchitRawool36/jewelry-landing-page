@@ -1,68 +1,61 @@
-import React from 'react'
-import ShinyText from './ShinyText'
-import GooeyNav from './GooeyNav'
+import React, { useState } from 'react';
+import ShinyText from './ShinyText';
 
-export default function Navbar(){
+const Navbar = () => {
+  const [open, setOpen] = useState(false);
+  const navItems = [
+    { label: 'Home', href: '#' },
+    { label: 'Products', href: '#products' },
+    { label: 'About', href: '#about' },
+    { label: 'Contact', href: '#contact' },
+  ];
+
   return (
-  <header className="sticky top-0 z-50 relative py-4 px-4 md:px-8 overflow-hidden bg-[#f7f3ea] border-b border-[#e6dcc3]">
-      {/* Subtle Royal Glow */}
+    <header className="sticky top-0 left-0 right-0 z-[100] bg-ivory/80 backdrop-blur-sm border-b border-gold/20 text-gray-800 shadow-md">
+      <div className="container mx-auto flex items-center justify-between p-4">
+        <div className="text-2xl md:text-3xl font-serif font-bold leading-tight max-w-[60%] md:max-w-none">
+          <ShinyText text="Aura Jewellers" baseColor="#4A4A4A" shineColor="#D4AF37" />
+        </div>
+        <nav className="hidden sm:block">
+          <ul className="flex space-x-6">
+            {navItems.map((item) => (
+              <li key={item.label}>
+                <a href={item.href} className="font-sans hover:text-gold transition-colors duration-300">
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <button
+          className="sm:hidden px-3 py-2 rounded border border-gold/40 text-sm focus:outline-none focus:ring-2 focus:ring-gold/60"
+          aria-label="Menu"
+          aria-expanded={open}
+          onClick={() => setOpen(o=>!o)}
+        >
+          {open ? 'Close' : 'Menu'}
+        </button>
+      </div>
+      {/* Mobile menu panel */}
       <div
-        className="absolute inset-0 z-0"
-        style={{
-          background: `radial-gradient(900px 400px at 80% 10%, rgba(203,178,106,0.25), transparent 60%)`,
-          pointerEvents: 'none',
-        }}
-      />
-
-      <div className="relative z-10">
-        {/* Top row: brand and desktop nav */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="font-bold text-lg">
-            <ShinyText text="Aura Jewelers" speed={4} baseColor="#3a2a1a" />
-          </div>
-          <div className="hidden md:block">
-            <div style={{ height: 64, display: 'flex', alignItems: 'center' }}>
-              <GooeyNav
-                items={[
-                  { label: 'Products', href: '#products' },
-                  { label: 'About', href: '#about' },
-                  { label: 'Contact', href: '#contact' },
-                ]}
-                particleCount={12}
-                particleDistances={[90, 10]}
-                particleR={100}
-                initialActiveIndex={0}
-                animationTime={600}
-                timeVariance={300}
-                colors={[1,2,3,1,2,3,1,4]}
-                className="light"
-              />
-            </div>
-          </div>
-          <div className="hidden md:block text-sm text-slate-700">Free shipping over 1000rs</div>
-        </div>
-
-        {/* Mobile full-width GooeyNav */}
-    <div className="md:hidden w-full mt-3">
-          <div style={{ height: 80, position: 'relative', borderRadius: 12, padding: '8px 12px' }}>
-            <GooeyNav
-              items={[
-                { label: 'Products', href: '#products' },
-                { label: 'About', href: '#about' },
-                { label: 'Contact', href: '#contact' },
-              ]}
-              particleCount={10}
-              particleDistances={[80, 10]}
-              particleR={80}
-              initialActiveIndex={0}
-              animationTime={600}
-              timeVariance={300}
-      colors={[1,2,3,1,2,3,1,4]}
-      className="light"
-            />
-          </div>
-        </div>
+        className={`sm:hidden overflow-hidden transition-[max-height] duration-300 ease-in-out bg-ivory/95 border-t border-gold/20 ${open ? 'max-h-64' : 'max-h-0'}`}
+      >
+        <ul className="flex flex-col py-2 px-4 gap-1">
+          {navItems.map(item => (
+            <li key={item.label}>
+              <a
+                href={item.href}
+                className="block w-full px-3 py-2 rounded text-sm font-sans hover:bg-gold/10 active:bg-gold/20"
+                onClick={() => setOpen(false)}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
       </div>
     </header>
-  )
-}
+  );
+};
+
+export default Navbar;

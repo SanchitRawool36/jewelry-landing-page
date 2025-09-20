@@ -8,6 +8,7 @@ This repository contains an interactive landing page demo for a jewelry brand.
 - Polished vs Matte material finish toggle
 - Mobile-responsive layout with a bottom product tray
 - Demo GLB models can be fetched with the included PowerShell script
+- Photo gallery with accessible lightbox (keyboard navigation, ESC close)
 
 ## Local setup
 1. Fetch demo models (optional, run locally on Windows PowerShell):
@@ -27,6 +28,12 @@ python -m http.server 8080
 ```
 
 3. Open `http://localhost:8080` in your browser.
+
+## Lightbox Usage (Development)
+The photo showcase uses `PhotoLightbox` (`src/components/PhotoLightbox.jsx`).
+Trigger: Clicking any photo card opens the modal.
+Keyboard: Arrow keys navigate, ESC closes.
+Accessible: `role="dialog"` with aria-modal and buttons have labels. Extend with focus trapping if further interactive content is added.
 
 ## Deploy to Netlify
 - Connect this GitHub repository to Netlify and set:

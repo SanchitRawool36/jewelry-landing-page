@@ -4,6 +4,8 @@ import { PRESSETS } from './presets'
 
 // TryOn: mounts a small Three.js overlay, uses MediaPipe FaceMesh to anchor a cloned model
 export default function TryOn({ productId, sourceModel, onClose }){
+  // Resolve preset once per render from productId (fallback to necklace)
+  const presetData = PRESSETS[productId] || PRESETS['necklace'] || { attach: 'ear', offset: { x:0, y:0, z:0 }, scale: 1 }
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [running, setRunning] = useState(false)
@@ -22,6 +24,8 @@ export default function TryOn({ productId, sourceModel, onClose }){
   const [showCoords, setShowCoords] = useState(false)
   const [showLabels, setShowLabels] = useState(false)
   const [showGrid, setShowGrid] = useState(false)
+  const [anchorMode, setAnchorMode] = useState(null) // 'ear' | 'neck' | 'nose' | null(auto)
+  const attachType = anchorMode || presetData.attach || 'ear'
   const [faceInfo, setFaceInfo] = useState({
     nose: { x: '-', y: '-', z: '-' },
     leftEar: { x: '-', y: '-', z: '-' },
@@ -314,7 +318,8 @@ export default function TryOn({ productId, sourceModel, onClose }){
   lastResultRef.current = performance.now()
   if (statusRef.current !== 'Tracking face') setStatus('Tracking face')
     if (or.model) or.model.visible = true
-    const preset = PRESSETS[pid] || PRESSETS['necklace']
+    const preset = PRESSETS[pid] || presetData
+    const activeAttach = anchorMode || preset.attach || 'ear'
 
     // DT for framerate-compensated smoothing
     const now = performance.now()
@@ -398,26 +403,24 @@ export default function TryOn({ productId, sourceModel, onClose }){
         arr[idx++] = va.x; arr[idx++] = va.y; arr[idx++] = va.z
         arr[idx++] = vb.x; arr[idx++] = vb.y; arr[idx++] = vb.z
       }
-      or.debugLines.geometry.setDrawRange(0, conns.length * 2)
-      or.debugLines.geometry.attributes.position.needsUpdate = true
+      // trim buffer if needed
+      if (pos.count > idx / 3) pos.count = idx / 3
+      pos.needsUpdate = true
     }
 
-    // Compute head orientation basis from eyes and nose
-    // x-axis: from right eye to left eye; y-axis: approx from nose to eyes; z-axis: cross
-  // Orientation basis without extra sign (mirroring handled by toVec3)
-  let xAxis = rEyeOuter.clone().sub(lEyeOuter) // left-to-right
-    if (xAxis.lengthSq() < 1e-6) xAxis = new THREE.Vector3(1,0,0)
-    xAxis.normalize()
-    let yApprox = midEye.clone().sub(nose) // up-ish
-    if (yApprox.lengthSq() < 1e-6) yApprox = new THREE.Vector3(0,1,0)
-    yApprox.normalize()
-    let zAxis = new THREE.Vector3().crossVectors(xAxis, yApprox)
-    if (zAxis.lengthSq() < 1e-6) zAxis = new THREE.Vector3(0,0,1)
-    zAxis.normalize()
-    let yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize()
+    // --- Transform model ---
+    // Scale based on eye distance
+    const targetScale = lEyeOuter.distanceTo(rEyeOuter) * (preset.scale || 1) * sizeMul
+    // Smooth scale
+    const finalScale = THREE.MathUtils.lerp(smoothRef.current.scale, targetScale, 1 - Math.exp(-15 * dt))
+    smoothRef.current.scale = finalScale
+    or.model.scale.setScalar(finalScale)
 
+    // Position and Rotate
+    const up = chin.clone().sub(midEye).normalize()
+    const fwd = new THREE.Vector3().crossVectors(rEyeOuter.clone().sub(lEyeOuter).normalize(), up).normalize()
     const rotMat = new THREE.Matrix4()
-    rotMat.makeBasis(xAxis, yAxis, zAxis) // columns are x,y,z axes
+    rotMat.makeBasis(fwd, up, new THREE.Vector3().crossVectors(fwd, up).normalize()) // columns are x,y,z axes
     const targetQuat = new THREE.Quaternion().setFromRotationMatrix(rotMat)
 
     // Optional per-product rotation offset (Euler degrees)
@@ -444,7 +447,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
     or.model.quaternion.copy(smoothRef.current.rot)
 
   // anchor by nose for neck, by ear for earrings, by nostril for nose ring
-    if (preset.attach === 'neck'){
+    if (attachType === 'neck'){
       // Anchor around neck line: start near nose but bias towards chin
       const neckAnchor = nose.clone().lerp(chin, 0.6)
       const targetPos = new THREE.Vector3(neckAnchor.x + preset.offset.x, neckAnchor.y + preset.offset.y, preset.offset.z)
@@ -465,7 +468,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
       }
-  } else if (preset.attach === 'ear'){
+    } else if (attachType === 'ear'){
       // place near ear landmarks
       const left = lm[234]
       const right = lm[454]
@@ -492,7 +495,7 @@ export default function TryOn({ productId, sourceModel, onClose }){
   smoothRef.current.scale = THREE.MathUtils.lerp(smoothRef.current.scale || rawS, rawS, kS)
   or.model.scale.setScalar(smoothRef.current.scale)
       }
-    } else if (preset.attach === 'nose'){
+    } else if (attachType === 'nose'){
       // Place near left nostril area relative to head x-axis from eyes
   let xAxis = rEyeOuter.clone().sub(lEyeOuter)
       if (xAxis.lengthSq() < 1e-6) xAxis = new THREE.Vector3(1,0,0)
@@ -524,101 +527,79 @@ export default function TryOn({ productId, sourceModel, onClose }){
   }
 
   return (
-    <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-      {/* Mirror video+canvas for selfie mode to match landmark coordinates */}
-      <div style={{position:'absolute',inset:0,transform:'scaleX(-1)'}}>
-        <video ref={videoRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',pointerEvents:'none',zIndex:0}} autoPlay playsInline muted></video>
-        <div ref={canvasRef} style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:1}} />
-      </div>
-      <div style={{position:'absolute',top:'12px',left:'12px',pointerEvents:'auto',zIndex:2, display:'flex', gap:8}}>
-        <button onClick={() => { onClose(); }} className="btn" aria-label="Close camera">Close Camera</button>
-      </div>
-      <div style={{position:'absolute',top:'60px',left:'12px',pointerEvents:'auto',zIndex:2}} className="card p-2">
-        <div className="text-xs font-medium mb-1">Size</div>
-        <input type="range" min={0.3} max={1.2} step={0.01} value={sizeMul} onChange={(e)=>setSizeMul(parseFloat(e.target.value))} style={{width:180}} />
-      </div>
-      {showLabels && (
-        <div style={{position:'absolute',inset:0,transform:'scaleX(-1)',pointerEvents:'none',zIndex:2}}>
-          {[
-            { key:'nose', label:'Nose', pos:labelPos.nose },
-            { key:'leftEye', label:'LEye', pos:labelPos.leftEye },
-            { key:'rightEye', label:'REye', pos:labelPos.rightEye },
-            { key:'leftEar', label:'LEar', pos:labelPos.leftEar },
-            { key:'rightEar', label:'REar', pos:labelPos.rightEar },
-          ].map(it => (
-            <span key={it.key}
-              style={{
-                position:'absolute',
-                left: `${(it.pos?.x ?? 0.5) * 100}%`,
-                top: `${(it.pos?.y ?? 0.5) * 100}%`,
-                transform:'translate(-50%, -120%)',
-                background:'rgba(0,0,0,0.6)',
-                color:'#fff',
-                fontSize:12,
-                padding:'2px 6px',
-                borderRadius:6,
-                whiteSpace:'nowrap'
-              }}
-            >{it.label}</span>
-          ))}
+    <div className="tryon-overlay" ref={overlayRef}>
+      <video ref={videoRef} className="tryon-video" autoPlay playsInline muted />
+      <div ref={canvasRef} className="tryon-canvas-container" />
+      {errorMsg && <div className="tryon-error">
+        <div className="text-lg font-bold text-red-500">Error</div>
+        <p>{errorMsg}</p>
+        <button onClick={onClose} className="btn-primary mt-4">Close</button>
+      </div>}
+      {!errorMsg && <div className="tryon-ui">
+        <div className="absolute top-4 right-4 flex flex-col gap-2 items-end">
+          <button onClick={onClose} className="btn-primary bg-black/50 hover:bg-black/80 border-none">Close</button>
+          <div className="p-2 rounded-lg bg-black/50 text-white text-sm text-center min-w-[180px]">{status}</div>
         </div>
-      )}
-      {showGrid && (
-        <div style={{position:'absolute',inset:0,transform:'scaleX(-1)',pointerEvents:'none',zIndex:2}}>
-          <div
-            style={{
-              position:'absolute',
-              left: `${faceBox.x * 100}%`,
-              top: `${faceBox.y * 100}%`,
-              width: `${faceBox.w * 100}%`,
-              height: `${faceBox.h * 100}%`,
-              border: '1px solid rgba(255,255,255,0.7)',
-              boxShadow: '0 0 0 9999px rgba(0,0,0,0.0)',
-              borderRadius: 6
-            }}
-          >
-            {/* 3x3 grid lines */}
-            <div style={{position:'absolute',left:'33.333%',top:0,bottom:0,width:1,background:'rgba(255,255,255,0.6)'}}></div>
-            <div style={{position:'absolute',left:'66.666%',top:0,bottom:0,width:1,background:'rgba(255,255,255,0.6)'}}></div>
-            <div style={{position:'absolute',top:'33.333%',left:0,right:0,height:1,background:'rgba(255,255,255,0.6)'}}></div>
-            <div style={{position:'absolute',top:'66.666%',left:0,right:0,height:1,background:'rgba(255,255,255,0.6)'}}></div>
-            {/* Center crosshair */}
-            <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:12,height:12,border:'1px solid rgba(255,255,255,0.75)',borderRadius:2}}></div>
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm p-2 rounded-lg text-white flex flex-col items-center gap-2 w-[92vw] max-w-[340px]">
+          <div className="flex flex-wrap justify-center gap-1 text-[11px] sm:text-xs">
+            <span className="opacity-80">Anchor:</span>
+            {['ear','neck','nose'].map(a => {
+              const active = (anchorMode || presetData.attach) === a
+              return (
+                <button key={a} onClick={()=>setAnchorMode(a)} className={`px-2 py-1 rounded min-w-[46px] ${active ? 'bg-gold text-black' : 'bg-white/20 text-white'}`}>{a}</button>
+              )
+            })}
+            <button onClick={()=>setAnchorMode(null)} className={`px-2 py-1 rounded min-w-[46px] ${(anchorMode===null)?'bg-gold text-black':'bg-white/20 text-white'}`}>Auto</button>
+          </div>
+          <div className="flex items-center gap-2 w-full justify-center">
+            <label htmlFor="size-slider" className="text-xs sm:text-sm">Size</label>
+            <input
+              id="size-slider"
+              type="range"
+              min="0.05"
+              max="1.0"
+              step="0.01"
+              value={sizeMul}
+              onChange={(e) => setSizeMul(parseFloat(e.target.value))}
+              className="w-40 sm:w-48"
+            />
           </div>
         </div>
-      )}
-      {/* Status chip (top-right) */}
-      <div style={{position:'absolute',top:12,right:12,zIndex:2,pointerEvents:'none'}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(17,17,17,0.7)',color:'#fff',padding:'6px 10px',borderRadius:9999,border:'1px solid rgba(255,255,255,0.12)',backdropFilter:'blur(6px)'}}>
-          <span style={{display:'inline-block',width:8,height:8,borderRadius:9999,background:(()=>{
-            if (status.startsWith('Tracking')) return '#16a34a' // green
-            if (status.startsWith('No face')) return '#dc2626' // red
-            if (status.startsWith('Loading')) return '#3b82f6' // blue
-            return '#f59e0b' // amber for looking
-          })()}} />
-          <span style={{fontSize:12,opacity:0.95}}>{status}</span>
+        <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2 text-white">
+          <label className="flex items-center gap-2 text-xs cursor-pointer bg-black/50 p-1 rounded">
+            <input type="checkbox" checked={showMesh} onChange={e=>setShowMesh(e.target.checked)} />
+            Show Face Mesh
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer bg-black/50 p-1 rounded">
+            <input type="checkbox" checked={showCoords} onChange={e=>setShowCoords(e.target.checked)} />
+            Show Coords
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer bg-black/50 p-1 rounded">
+            <input type="checkbox" checked={showLabels} onChange={e=>setShowLabels(e.target.checked)} />
+            Show Labels
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer bg-black/50 p-1 rounded">
+            <input type="checkbox" checked={showGrid} onChange={e=>setShowGrid(e.target.checked)} />
+            Show Grid
+          </label>
         </div>
-      </div>
-      {showCoords && (
-        <div style={{position:'absolute',top:52,right:12,zIndex:2,pointerEvents:'auto'}} className="card p-2">
-          <div className="text-xs font-medium mb-1">Face points (0–1)</div>
-          <div className="text-xs text-slate-700">Nose: {faceInfo.nose.x}, {faceInfo.nose.y}</div>
-          <div className="text-xs text-slate-700">LEar: {faceInfo.leftEar.x}, {faceInfo.leftEar.y}</div>
-          <div className="text-xs text-slate-700">REar: {faceInfo.rightEar.x}, {faceInfo.rightEar.y}</div>
-          <div className="text-xs text-slate-700">LEye: {faceInfo.leftEye.x}, {faceInfo.leftEye.y}</div>
-          <div className="text-xs text-slate-700">REye: {faceInfo.rightEye.x}, {faceInfo.rightEye.y}</div>
-        </div>
-      )}
-  {/* Start button removed: camera starts automatically when overlay opens */}
-      {errorMsg && (
-        <div style={{position:'absolute',bottom:12,left:'50%',transform:'translateX(-50%)',pointerEvents:'auto'}} className="card p-3 max-w-md">
-          <div className="text-sm text-slate-700">{errorMsg}</div>
-          <div className="mt-2 flex gap-2">
-            <button className="btn" onClick={()=>setErrorMsg(null)}>Dismiss</button>
-            <button className="btn btn-primary" onClick={()=>{ start() }}>Retry</button>
-          </div>
-        </div>
-      )}
+      </div>}
+      {showCoords && <div className="absolute top-1/2 left-4 -translate-y-1/2 bg-black/60 text-white p-2 rounded-lg text-xs font-mono w-48">
+        <div className="font-bold mb-1">Face Landmarks (0-1)</div>
+        <div>Nose: {faceInfo.nose.x}, {faceInfo.nose.y}, {faceInfo.nose.z}</div>
+        <div>L.Ear: {faceInfo.leftEar.x}, {faceInfo.leftEar.y}, {faceInfo.leftEar.z}</div>
+        <div>R.Ear: {faceInfo.rightEar.x}, {faceInfo.rightEar.y}, {faceInfo.rightEar.z}</div>
+        <div>L.Eye: {faceInfo.leftEye.x}, {faceInfo.leftEye.y}, {faceInfo.leftEye.z}</div>
+        <div>R.Eye: {faceInfo.rightEye.x}, {faceInfo.rightEye.y}, {faceInfo.rightEye.z}</div>
+      </div>}
+      {showLabels && <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute -translate-x-1/2 -translate-y-1/2 text-cyan-300 text-xs" style={{left: `${labelPos.nose.x*100}%`, top: `${labelPos.nose.y*100}%`}}>Nose</div>
+        <div className="absolute -translate-x-1/2 -translate-y-1/2 text-cyan-300 text-xs" style={{left: `${labelPos.leftEar.x*100}%`, top: `${labelPos.leftEar.y*100}%`}}>L.Ear</div>
+        <div className="absolute -translate-x-1/2 -translate-y-1/2 text-cyan-300 text-xs" style={{left: `${labelPos.rightEar.x*100}%`, top: `${labelPos.rightEar.y*100}%`}}>R.Ear</div>
+        <div className="absolute -translate-x-1/2 -translate-y-1/2 text-cyan-300 text-xs" style={{left: `${labelPos.leftEye.x*100}%`, top: `${labelPos.leftEye.y*100}%`}}>L.Eye</div>
+        <div className="absolute -translate-x-1/2 -translate-y-1/2 text-cyan-300 text-xs" style={{left: `${labelPos.rightEye.x*100}%`, top: `${labelPos.rightEye.y*100}%`}}>R.Eye</div>
+      </div>}
+      {showGrid && <div className="absolute top-0 left-0 w-full h-full pointer-events-none grid-bg" />}
     </div>
   )
 }

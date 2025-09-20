@@ -1,37 +1,44 @@
-import React from 'react'
-import ShinyText from './ShinyText'
+import React from 'react';
+// Use public/media path (files were moved from /Videos to /public/media)
+const HERO_VIDEO = '/media/855854-hd_1920_1080_24fps.mp4';
 
-export default function Hero({ onShopNow, onTryNow }){
+const Hero = () => {
+  const scrollToProducts = () => {
+    const productsSection = document.getElementById('products');
+    if (productsSection) {
+      productsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
-    <section className="relative overflow-hidden" style={{background:'#f7f3ea'}}>
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `radial-gradient(1200px 600px at 70% 20%, rgba(204,183,85,0.18), transparent 60%)`,
-          pointerEvents: 'none'
-        }}
+    <section className="relative h-screen flex items-center justify-center text-center text-white overflow-hidden">
+      <video 
+        src={HERO_VIDEO}
+        autoPlay 
+        loop 
+        muted 
+        playsInline
+        preload="auto"
+        className="absolute z-0 w-auto min-w-full min-h-full max-w-none object-cover"
+        aria-label="Hero background showcase video"
       />
-      <div className="relative z-10 px-4 md:px-8 py-20 md:py-28 grid md:grid-cols-2 gap-10 items-center">
-        <div>
-          <ShinyText className="text-4xl md:text-6xl font-semibold" baseColor="#3a2a1a">
-            Timeless Elegance, Modern Shine
-          </ShinyText>
-          <p className="mt-4 text-slate-700 max-w-xl">
-            Discover regal designs crafted to perfection. Explore finishes, adjust shine, and try them on—right from your screen.
-          </p>
-          <div className="mt-6 flex gap-3">
-            <button className="btn btn-primary" onClick={onShopNow}>Shop Now</button>
-            <button className="btn" onClick={onTryNow}>Try On</button>
-          </div>
-        </div>
-        <div className="relative">
-          <div className="absolute -inset-6 rounded-full opacity-30" style={{background:'radial-gradient(circle at 40% 40%, #ccb755 0%, transparent 60%)'}} />
-          <div className="relative card p-6">
-            <div className="text-sm text-slate-800">Preview in 3D • Finish & Shine Controls</div>
-            <div className="mt-3 text-xs text-slate-600">Use the controls above the viewer to customize the look.</div>
-          </div>
-        </div>
+      <div className="absolute inset-0 bg-black/50 z-5"></div>
+      <div className="z-10 p-4">
+        <h1 className="text-5xl md:text-7xl font-serif font-bold mb-4">
+          Elegance in Motion
+        </h1>
+        <p className="text-lg md:text-xl max-w-2xl mx-auto mb-8">
+          Discover timeless designs and see them come to life. Your next treasure awaits.
+        </p>
+        <button
+          onClick={scrollToProducts}
+          className="btn-primary text-lg"
+        >
+          Explore Now
+        </button>
       </div>
     </section>
-  )
-}
+  );
+};
+
+export default Hero;
